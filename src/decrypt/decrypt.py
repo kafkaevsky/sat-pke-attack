@@ -1,13 +1,14 @@
 import h5py
 import numpy as np
+import argparse
 
-def decrypt():
+def g(n):
 
-    with open("data/cipher_0_dir/priv_0.txt", "r") as file:
+    with open(f"data/cipher_{n}_dir/priv_{n}.txt", "r") as file:
 
         priv = file.read()
 
-        with h5py.File("data/cipher_0_dir/cipher_0.hdf5", "r") as file:
+        with h5py.File(f"data/cipher_{n}_dir/cipher_{n}.hdf5", "r") as file:
             
             if "expression" in file:
 
@@ -30,17 +31,33 @@ def decrypt():
 
                 size = sum(1 for _ in expression)
 
-                g = size % 2
+                g_res = size % 2
 
-                return g
+                return g_res
 
 
-g_decryption = decrypt()
-with open("data/cipher_0_dir/plain_0.txt", "r") as file:
-    
-    y = int(file.read())
-    res = {
-        0: "SUCCESS",
-        1: "FAILURE"
-    }
-    print(f"{res[g_decryption]}: y={y}, g(priv)={y ^ g_decryption}")
+def decrypt(n):
+    g_decryption = g(n)
+    with open(f"data/cipher_{n}_dir/plain_{n}.txt", "r") as file:
+        
+        y = int(file.read())
+        res = {
+            0: "SUCCESS",
+            1: "FAILURE"
+        }
+        print(f"{res[y ^ g_decryption]}: y={y}, g(priv)={g_decryption}")
+
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="Encrypt",
+        description="Generates ciphertext file from plaintext based on Sebastian E. Schmittner's SAT-Based Public Key Encryption Scheme",
+        epilog="https://eprint.iacr.org/2015/771.pdf",
+    )
+
+    parser.add_argument("n", type=int)
+    args = parser.parse_args()
+
+    decrypt(args.n)
