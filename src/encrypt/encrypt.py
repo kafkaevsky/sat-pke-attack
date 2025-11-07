@@ -20,7 +20,7 @@ secure = secrets.SystemRandom()
 
 def distribute(iterable):  # from itertools powerset recipe
     return flatten.from_iterable(
-        subset(iterable, r) for r in range(1, len(iterable) + 1)
+        subset(iterable, r) for r in range(len(iterable) + 1)
     )
 
 
@@ -49,7 +49,6 @@ def cnf_to_neg_anf(term):
     term = filter(lambda t: 0 not in t, term)  # a*0 = 0
     term = map(lambda t: tuple(filter(lambda t: t != 1, t)), term)  # a*1 = a
     term = map(lambda t: tuple(set(t)), term)  # a*a = a
-    term = filter(lambda t: len(t) > 0, term)
     return term
 
 
@@ -64,6 +63,7 @@ def encrypt():
     clauses_file.close()
 
     cipher = np.empty(0, dtype=object)
+    # cipher = np.append(cipher, np.array([1]))
     beta_literals_sets = []
 
     for a in range(BETA):
@@ -102,11 +102,11 @@ def encrypt():
             ### SUMMAND
             summand = product_simplify(clause, random)
 
-            summand = map(lambda t: tuple(filter(lambda t: t != 1, t)), summand)
-            summand = set(Counter(summand).items())
 
-            summand = filter(lambda t: t[1] % 2 == 1, summand)
-            summand = map(lambda t: t[0], summand)
+            # summand = map(lambda t: tuple(filter(lambda t: t != 1, t)), summand)
+            summand = map(lambda t: tuple(t), summand)
+
+
             summand = np.fromiter(summand, dtype=map)
 
             cipher = np.append(cipher, summand)
@@ -117,7 +117,31 @@ def encrypt():
     beta_sets_file.write(str(f"{beta_literals_sets}\n"))
     beta_sets_file.close()
 
+    cipher = set(Counter(cipher).items())
+    cipher = filter(lambda t: t[1] % 2 == 1, cipher)
+    cipher = list(map(lambda t: t[0], cipher))
+    
+    #####
+
+
+    constant_term = int(tuple() in cipher)
+    y_term = args.plaintext
+    # y_term=0, constant_term=0     =>      do nothing
+    # y_term=0, constant_term=1     =>      do nothing
+    # y_term=1, constant_term=0     =>      add constant term ()
+    # y_term=1, constant_term=1     =>      remove constant term ()
+
+    if y_term == 1 and constant_term == 0:
+        cipher.append(tuple())
+    if y_term == 1 and constant_term == 1:
+        cipher.remove(tuple())
+    
+
+    
+        
     cipher = np.fromiter([np.sort(t, axis=0) for t in cipher], dtype=object)
+
+
 
     ### SORT
 

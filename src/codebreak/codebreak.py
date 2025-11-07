@@ -120,6 +120,8 @@ def recover_plaintext(
         v__cnf_to_neg_anf = np.vectorize(cnf_to_neg_anf)
         C = v__cnf_to_neg_anf(possible_clauses)
 
+        # print(possible_clauses)
+
         for C_i in C:
 
             #####
@@ -127,18 +129,21 @@ def recover_plaintext(
 
             #####
             R_i_terms = R_terms
-            R_i_coefficients = map(
+            R_i_coefficients = np.fromiter(map(
                 lambda i: Coefficient(i),
                 range(coefficient_count - n, coefficient_count),
-            )
+            ), dtype=object)
             R_i = np.fromiter(zip(R_i_coefficients, R_i_terms), dtype=object)
+            # print(R_i_terms)
+            # print(R_i_coefficients)
+            # print(R_i)
 
             #####
             unformatted_C_iR_i = np.fromiter(cartesian(R_i, C_i), dtype=object)
             C_iR_i = []
 
             for term in unformatted_C_iR_i:
-                print(term)
+                # print(term)
 
                 coefficient = term[0][0]
                 literals = tuple(sorted([int(x) for x in set(term[0][1] + term[1])]))
@@ -146,19 +151,16 @@ def recover_plaintext(
                 C_iR_i.append(full_term)
 
             for term in C_iR_i:
-                print(term)
 
                 coefficient = term[0]
                 literals = term[1]
                 a_terms[literals] = a_terms[literals] + [coefficient]
+            # print(a_terms)
 
     def clause_vector(coefficients, cols):
         v = np.zeros(cols)
         for c in coefficients:
             v[c.value] = 1
-            # v[c.value] = (v[c.value] + 1) % 2
-            # NOTE: if we are using XOR we would do v[c.value] = (v[c.value] + 1) % 2
-            # whereas if we are using OR we would do v[c.value] = 1
         return v
 
     cipher = cipher_n__hdf5_file["expression"][:]
@@ -174,10 +176,12 @@ def recover_plaintext(
 
     rows = len(a_terms.keys())
     cols = coefficient_count
+    print(rows)
+    print(cols)
 
-    # system = defaultdict(tuple)
-    for x in a_terms:
-        print(x, a_terms[x])
+    # # system = defaultdict(tuple)
+    # for x in a_terms:
+    #      #print(x, a_terms[x])
 
     a = np.zeros((rows, cols), dtype=np.int64)
     b = np.zeros(rows, dtype=np.int64)
@@ -186,7 +190,7 @@ def recover_plaintext(
         a[i] = clause_vector(a_terms[term], cols)
         b[i] = int(term in simplified_cipher)
         if sum(a[i]) == 0 and b[i] == 1:
-            print(term, a[i], b[i])
+            # print(term, a[i], b[i])
             raise ValueError
         # system[term] = {
         #     "a_i": clause_vector(a_terms[term], cols),
@@ -204,7 +208,7 @@ def recover_plaintext(
     augmented_matrix = np.hstack((a, b.reshape(-1, 1)))
     rank_augmented = np.linalg.matrix_rank(augmented_matrix)
 
-    y = int(rank_a == rank_augmented)
+    y = int(rank_a != rank_augmented)
     lhs = f"rank([A])={rank_a}, rank([A|b])={rank_augmented}"
     rhs = f"y = {y}"
     print(
