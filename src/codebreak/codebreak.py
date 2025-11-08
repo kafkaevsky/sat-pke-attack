@@ -112,22 +112,22 @@ def recover_plaintext(
         if len(possible_clauses) < ALPHA:
             raise ValueError(f"<{ALPHA} clauses found")
 
-        R_terms = np.fromiter(distribute(beta_literals_set), dtype=object)
-
-        n = len(R_terms)
-        coefficient_count += n
-
         v__cnf_to_neg_anf = np.vectorize(cnf_to_neg_anf)
         C = v__cnf_to_neg_anf(possible_clauses)
-
-        # print(possible_clauses)
-
-        for C_i in C:
-
+        for i, C_i in enumerate(C):
             #####
             C_i = np.fromiter(C_i, dtype=object)
 
             #####
+
+            C_minus_C_i = list(possible_clauses[:i]) + list(possible_clauses[i+1:])
+            R_i_literals_set = list(set([l[0] for l in flatten(*C_minus_C_i)]))
+
+
+            R_terms = np.fromiter(distribute(R_i_literals_set), dtype=object)
+            n = len(R_terms)
+            coefficient_count += n
+
             R_i_terms = R_terms
             R_i_coefficients = np.fromiter(map(
                 lambda i: Coefficient(i),

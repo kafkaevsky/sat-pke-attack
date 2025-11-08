@@ -3,7 +3,7 @@
 ### PARAMETERS
 
 GENERATE_CLEARS_DATA=false # OPTIONS: true, false
-PLAINTEXT="random" # OPTIONS: 0, 1, "random"
+PLAINTEXT=0 # OPTIONS: 0, 1, "random"
 
 ### OPTIONAL CIPHER DIRECTORY FILES
 
