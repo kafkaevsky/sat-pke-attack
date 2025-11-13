@@ -100,18 +100,17 @@ def encrypt():
     cipher = np.fromiter([np.sort(t, axis=0) for t in cipher], dtype=object)
 
     ### clauses_n__txt AND # clauses_n__hdf5
-    if not LEAVE_CLAUSES_UNSORTED:
+    if LEAVE_CLAUSES_UNSORTED:
         cipher = sorted(
             cipher,
-            key=lambda term: [p(term) for p in CIPHERTEXT_SORTING_ORDER],
+            key=lambda term: np.array([p(term) for p in CIPHERTEXT_SORTING_ORDER]),
             reverse=True,
         )
 
     ### private_key_n__txt
-    if INCLUDE_PRIVATE_KEY_N__TXT:
-        f = open(f"data/cipher_{args.n}_dir/private_key_{args.n}.txt", "w")
-        f.write(str(f"{key.PRIVATE_KEY_STRING}\n"))
-        f.close()
+    f = open(f"data/cipher_{args.n}_dir/private_key_{args.n}.txt", "w")
+    f.write(str(f"{key.PRIVATE_KEY_STRING}\n"))
+    f.close()
 
     ### beta_literals_sets_n__txt
     if INCLUDE_BETA_LITERALS_SETS_N__TXT:
@@ -120,10 +119,9 @@ def encrypt():
         f.close()
 
     ### clauses_n__txt
-    if INCLUDE_CLAUSES_N__TXT:
-        f = open(f"data/cipher_{args.n}_dir/clauses_{args.n}.txt", "w")
-        f.write(str(CLAUSES))
-        f.close()
+    f = open(f"data/cipher_{args.n}_dir/clauses_{args.n}.txt", "w")
+    f.write(str(CLAUSES))
+    f.close()
 
     ### clauses_n__hdf5
     vlen_dtype = h5py.vlen_dtype(np.dtype("float64"))

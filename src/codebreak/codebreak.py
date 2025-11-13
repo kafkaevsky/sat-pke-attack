@@ -57,7 +57,12 @@ def recover_beta_literals(ciphertext_n__hdf5_file):
 
             while True:
 
-                closeness = map(lambda x: (x, len(group.difference(x))), ciphertext)
+                print("hi")
+                closeness = np.fromiter(
+                    map(lambda x: (x, len(group.difference(x))), ciphertext),
+                    dtype=object,
+                )
+                print(closeness)
                 closest = min(closeness, key=lambda x: x[1])
 
                 max_diff = math.floor(MAX_DIFF_PCT * len(group))
@@ -76,9 +81,7 @@ def recover_beta_literals(ciphertext_n__hdf5_file):
         return sorted(beta_literals_sets)
 
 
-def recover_plaintext(
-    ciphertext_n__hdf5_file, clauses_n__txt_file, beta_literals_sets_n__txt_file
-):
+def recover_plaintext(ciphertext_n__hdf5_file, clauses_n__txt_file):
 
     beta_literals_sets = recover_beta_literals(ciphertext_n__hdf5_file)
 
@@ -195,27 +198,17 @@ def codebreak(n):
     cipher_n_dir = f"{os.environ.get("DATA_DIRECTORY")}/cipher_{n}_dir"
     ciphertext_n__hdf5 = f"{cipher_n_dir}/ciphertext_{n}.hdf5"
     clauses_n__txt = f"{cipher_n_dir}/clauses_{n}.txt"
-    beta_literals_sets_n__txt = f"{cipher_n_dir}/beta_literals_sets_{n}.txt"
 
     with h5py.File(ciphertext_n__hdf5, "r") as ciphertext_n__hdf5_file:
         with open(clauses_n__txt, "r") as clauses_n__txt_file:
-            with open(beta_literals_sets_n__txt, "r") as beta_literals_sets_n__txt_file:
-                y = recover_plaintext(
-                    ciphertext_n__hdf5_file,
-                    clauses_n__txt_file,
-                    beta_literals_sets_n__txt_file,
-                )
-                return y
+            y = recover_plaintext(ciphertext_n__hdf5_file, clauses_n__txt_file)
+            return y
 
 
 ###
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        prog="Encrypt",
-        description="Generates ciphertext file from plaintext based on Sebastian E. Schmittner's SAT-Based Public Key Encryption Scheme",
-        epilog="https://eprint.iacr.org/2015/771.pdf",
-    )
+    parser = argparse.ArgumentParser(prog="Codebreak")
 
     parser.add_argument("n", type=int)
     args = parser.parse_args()
