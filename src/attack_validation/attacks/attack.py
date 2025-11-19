@@ -9,8 +9,8 @@ import galois
 import h5py
 import numpy as np
 
-from src.encrypt.encrypt import cnf_to_neg_anf, distribute
-from parameters import *
+from attack_validation.primitives.encrypt import cnf_to_neg_anf, distribute
+from ..parameters import *
 
 sys.path.append(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -83,14 +83,18 @@ def recover_beta_literals(ciphertext_n__hdf5_file):
         return sorted(beta_literals_sets)
 
 
-def recover_plaintext(ciphertext_n__hdf5_file, clauses_n__txt_file, beta_literals_sets_n__txt_file, formatted_printout):
+def recover_plaintext(
+    args,
+    ciphertext_n__hdf5_file,
+    clauses_n__txt_file,
+    beta_literals_sets_n__txt_file,
+    formatted_printout,
+):
 
     real_beta_literals_sets = ast.literal_eval(beta_literals_sets_n__txt_file.read())
     recovered_beta_literals_sets = recover_beta_literals(ciphertext_n__hdf5_file)
     if real_beta_literals_sets != recovered_beta_literals_sets:
         return -1
-
-
 
     clauses = clauses_n__txt_file.read()
     all_clauses = ast.literal_eval(clauses)
@@ -202,28 +206,37 @@ def recover_plaintext(ciphertext_n__hdf5_file, clauses_n__txt_file, beta_literal
     return y
 
 
-def codebreak(n, formatted_printout=False):
-    cipher_n_dir = f"{os.environ.get("DATA_DIRECTORY")}/cipher_{n}_dir"
-    ciphertext_n__hdf5 = f"{cipher_n_dir}/ciphertext_{n}.hdf5"
-    clauses_n__txt = f"{cipher_n_dir}/clauses_{n}.txt"
-    beta_literals_sets_n__txt = f"{cipher_n_dir}/beta_literals_sets_{n}.txt"
+def codebreak(args, formatted_printout=False):
+    cipher_n_dir = f"{os.environ.get("DATA_DIRECTORY")}/cipher_{args.n}_dir"
+    ciphertext_n__hdf5 = f"{cipher_n_dir}/ciphertext_{args.n}.hdf5"
+    clauses_n__txt = f"{cipher_n_dir}/clauses_{args.n}.txt"
+    beta_literals_sets_n__txt = f"{cipher_n_dir}/beta_literals_sets_{args.n}.txt"
 
     with h5py.File(ciphertext_n__hdf5, "r") as ciphertext_n__hdf5_file:
         with open(clauses_n__txt, "r") as clauses_n__txt_file:
             with open(beta_literals_sets_n__txt, "r") as beta_literals_sets_n__txt_file:
                 y = recover_plaintext(
-                    ciphertext_n__hdf5_file, clauses_n__txt_file, beta_literals_sets_n__txt_file, formatted_printout
+                    args,
+                    ciphertext_n__hdf5_file,
+                    clauses_n__txt_file,
+                    beta_literals_sets_n__txt_file,
+                    formatted_printout,
                 )
                 return y
 
 
 ###
 
-if __name__ == "__main__":
+
+def main():
     parser = argparse.ArgumentParser(prog="Codebreak")
 
     parser.add_argument("n", type=int)
     args = parser.parse_args()
 
-    y = codebreak(args.n)
+    y = codebreak(args)
     print(y)
+
+
+if __name__ == "__main__":
+    main()

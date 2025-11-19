@@ -9,7 +9,7 @@ from collections import Counter
 import numpy as np
 import h5py
 
-from parameters import *
+from ..parameters import *
 
 sys.path.append(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -39,7 +39,7 @@ def cnf_to_neg_anf(term):
     return term
 
 
-def encrypt():
+def encrypt(args):
     J_MAP = [secure.sample(range(1, M), ALPHA) for _ in range(BETA)]
     ### NOTE: this currently samples WITHOUT replacement for each row, 
     ### but with replacement between rows.
@@ -109,37 +109,40 @@ def encrypt():
         )
 
     ### private_key_n__txt
-    f = open(f"data/cipher_{args.n}_dir/private_key_{args.n}.txt", "w")
+    f = open(f"{os.environ.get("DATA_DIRECTORY")}/cipher_{args.n}_dir/private_key_{args.n}.txt", "w")
     f.write(str(f"{key.PRIVATE_KEY_STRING}\n"))
     f.close()
 
     ### beta_literals_sets_n__txt
-    f = open(f"data/cipher_{args.n}_dir/beta_literals_sets_{args.n}.txt", "w")
+    f = open(f"{os.environ.get("DATA_DIRECTORY")}/cipher_{args.n}_dir/beta_literals_sets_{args.n}.txt", "w")
     f.write(str(f"{beta_literals_sets}\n"))
     f.close()
 
     ### clauses_n__txt
-    f = open(f"data/cipher_{args.n}_dir/clauses_{args.n}.txt", "w")
+    f = open(f"{os.environ.get("DATA_DIRECTORY")}/cipher_{args.n}_dir/clauses_{args.n}.txt", "w")
     f.write(str(CLAUSES))
     f.close()
 
     ### clauses_n__hdf5
     vlen_dtype = h5py.vlen_dtype(np.dtype("float64"))
-    ciphertext_n__hdf5_file = f"data/cipher_{args.n}_dir/ciphertext_{args.n}.hdf5"
+    ciphertext_n__hdf5_file = f"{os.environ.get("DATA_DIRECTORY")}/cipher_{args.n}_dir/ciphertext_{args.n}.hdf5"
     with h5py.File(ciphertext_n__hdf5_file, "w") as f:
         dset = f.create_dataset(
             name="expression", shape=(len(cipher),), dtype=vlen_dtype
         )
         dset[:] = cipher
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
-        prog="Encrypt",
-        description="Generates ciphertext file from plaintext based on Sebastian E. Schmittner's SAT-Based Public Key Encryption Scheme",
-        epilog="https://eprint.iacr.org/2015/771.pdf",
+    prog="Encrypt",
+    description="Generates ciphertext file from plaintext based on Sebastian E. Schmittner's SAT-Based Public Key Encryption Scheme",
+    epilog="https://eprint.iacr.org/2015/771.pdf",
     )
     parser.add_argument("-n", type=int)
     parser.add_argument("-y", "--plaintext", choices=[1, 0], type=int)
     args = parser.parse_args()
 
-    encrypt()
+    encrypt(args)
+
+if __name__ == "__main__":
+    main()

@@ -1,6 +1,7 @@
-data/*
+.direnv/*
+.build/*
+venv/*
 __pycache__/
 *.trace
-.direnv/*
-build/*
-venv/*
+*.egg-info
+tests/*

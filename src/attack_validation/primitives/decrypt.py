@@ -5,9 +5,9 @@ import argparse
 
 def g(n):
 
-    with open(f"data/cipher_{n}_dir/private_key_{n}.txt", "r") as file:
+    with open(f"tests/cipher_{n}_dir/private_key_{n}.txt", "r") as file:
         priv = file.read()
-        with h5py.File(f"data/cipher_{n}_dir/ciphertext_{n}.hdf5", "r") as file:
+        with h5py.File(f"tests/cipher_{n}_dir/ciphertext_{n}.hdf5", "r") as file:
             if "expression" in file:
 
                 def assign(x):
@@ -36,7 +36,7 @@ def decrypt(n, formatted_printout=False):
     g_decryption = g(n)
 
     if formatted_printout:
-        with open(f"data/cipher_{n}_dir/plaintext_{n}.txt", "r") as file:
+        with open(f"tests/cipher_{n}_dir/plaintext_{n}.txt", "r") as file:
             y = int(file.read())
             print(f"decryption for cipher {n} with plaintext y={y}:")
             print(f"g(priv)={g_decryption}      =>      y=1")
@@ -44,8 +44,7 @@ def decrypt(n, formatted_printout=False):
                 print("DECRYPTION FAILURE")
     return g_decryption
 
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         prog="Encrypt",
         description="Generates ciphertext file from plaintext based on Sebastian E. Schmittner's SAT-Based Public Key Encryption Scheme",
@@ -57,3 +56,6 @@ if __name__ == "__main__":
 
     g_decryption = decrypt(args.n)
     print(g_decryption)
+
+if __name__ == "__main__":
+    main()

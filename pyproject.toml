@@ -1,5 +1,5 @@
 [project]
-name = "sat-scheme-attack-validation"
+name = "validation"
 version = "2025.0.0"
 requires-python = ">= 3.12, < 3.14"
 dependencies = [
@@ -11,3 +11,7 @@ dependencies = [
 ]
 [project.optional-dependencies]
 EXTRAS = ["termcolor==3.2.0"]
+[project.scripts]
+generate = "attack_validation.testing.tests:main"
+decrypt = "attack_validation.decrypt.decrypt:main"
+codebreak = "attack_validation.codebreak.codebreak:main"
