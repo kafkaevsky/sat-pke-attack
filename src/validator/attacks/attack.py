@@ -99,8 +99,7 @@ def _recover_plaintext(
         C = [cnf_to_neg_anf(c) for c in possible_clauses]
         for i, C_i in enumerate(C):
 
-            C_i = list(C_i)
-            C_i = np.fromiter(C_i, dtype=object)
+            C_i = np.fromiter(list(C_i), dtype=object)
             C_minus_C_i = list(possible_clauses[:i]) + list(possible_clauses[i + 1 :])
             R_i_literals_set = list(set([l[0] for l in flatten(*C_minus_C_i)]))
             R_terms = np.fromiter(distribute(R_i_literals_set), dtype=object)
@@ -138,7 +137,7 @@ def _recover_plaintext(
     def clause_vector(coefficients, cols):
         v = np.zeros(cols)
         for c in coefficients:
-            v[c.value] = 1
+            v[c.value] = int(not v[c.value])
         return v
 
     ciphertext = ciphertext_n__hdf5_file["ciphertext"][:]
@@ -146,16 +145,21 @@ def _recover_plaintext(
 
 
 
-    # if y=0 and const_term = 0: real ciphertext contains NOT contain ()
-    # if y=0 and const_term = 1: real ciphertext contains contain ()
-    # if y=1 and const_term = 0: real ciphertext contains contain ()
-    # if y=1 and const_term = 1: real ciphertext contains NOT contain ()
-    missing_terms = ciphertext - set(a_terms.keys())
+    # while encoding,
+    # A) if y=0 and the ANF is (0 ⊕ ...):       the ciphertext is (0 ⊕ ...)
+    # B) if y=0 and the ANF is (1 ⊕ ...):       the ciphertext is (1 ⊕ ...)
+    # C) if y=1 and the ANF is (0 ⊕ ...):       the ciphertext is (0 ⊕ ...) ⊕ 1  =   (1 ⊕ ...)
+    # D) if y=1 and the ANF is (1 ⊕ ...):       the ciphertext is (1 ⊕ ...) ⊕ 1  =   (0 ⊕ ...)
+
+    ### Attack is only failing in case C (though case C does sometimes work)
+    
+    missing_terms = ciphertext - set(a_terms.keys())    
+
     if len(missing_terms) > 0:
         if missing_terms == {tuple()}:
             return 1
-        else:
-            return -3
+        return -3
+    
 
     rows = len(a_terms.keys())
     cols = coefficient_count
@@ -189,7 +193,7 @@ def _recover_plaintext(
 
 def attack(args):
 
-    CIPHERTEXT_DIRPATH = f"tests/cipher_{args.i}_dir"
+    CIPHERTEXT_DIRPATH = f"tests/c_{args.i}"
     CIPHERTEXT_FILEPATH = f"{CIPHERTEXT_DIRPATH}/ciphertext_{args.i}.hdf5"
     CLAUSES_FILEPATH = f"{CIPHERTEXT_DIRPATH}/clauses_{args.i}.txt"
     BETA_LITERALS_SETS_FILEPATH = f"{CIPHERTEXT_DIRPATH}/beta_literals_sets_{args.i}.txt"

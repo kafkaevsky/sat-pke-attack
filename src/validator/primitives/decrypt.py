@@ -5,8 +5,8 @@ import argparse
 
 def _g(args):
 
-    PRIVATE_KEY_FILEPATH = f"tests/cipher_{args.n}_dir/private_key_{args.n}.txt"
-    CIPHERTEXT_FILEPATH = f"tests/cipher_{args.n}_dir/ciphertext_{args.n}.hdf5"
+    PRIVATE_KEY_FILEPATH = f"tests/c_{args.n}/private_key_{args.n}.txt"
+    CIPHERTEXT_FILEPATH = f"tests/c_{args.n}/ciphertext_{args.n}.hdf5"
 
     with open(PRIVATE_KEY_FILEPATH, "r") as file:
         priv = file.read()

@@ -1,7 +1,7 @@
 ### testing
-GENERATE_CLEARS_DATA = False # Clears all ciphertexts in tests directory.
-INCLUDE_READABLE_CIPHERTEXT = False  # Creates a readable ciphertext file.
-LEAVE_CLAUSES_UNSORTED = False # Optimization if clauses do not need to be read.
+EVALUATE_CLEARS_DATA = True # Clears all ciphertexts in tests directory.
+INCLUDE_READABLE_CIPHERTEXT = True  # Creates a readable ciphertext file.
+LEAVE_CLAUSES_UNSORTED = False # Optimization if clause order is not important for readability.
 
 ### encryption
 PLAINTEXT = "r" # Plaintext. [0, 1, or "r" (random)]

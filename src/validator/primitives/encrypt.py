@@ -76,12 +76,12 @@ def _encrypt(args):
             reverse=True,
         )
 
-    PRIVATE_KEY_FILEPATH = f"tests/cipher_{args.i}_dir/private_key_{args.i}.txt"
+    PRIVATE_KEY_FILEPATH = f"tests/c_{args.i}/private_key_{args.i}.txt"
     BETA_LITERALS_SETS_FILEPATH = (
-        f"tests/cipher_{args.i}_dir/beta_literals_sets_{args.i}.txt"
+        f"tests/c_{args.i}/beta_literals_sets_{args.i}.txt"
     )
-    CLAUSES_FILEPATH = f"tests/cipher_{args.i}_dir/clauses_{args.i}.txt"
-    CIPHERTEXT_FILEPATH = f"tests/cipher_{args.i}_dir/ciphertext_{args.i}.hdf5"
+    CLAUSES_FILEPATH = f"tests/c_{args.i}/clauses_{args.i}.txt"
+    CIPHERTEXT_FILEPATH = f"tests/c_{args.i}/ciphertext_{args.i}.hdf5"
 
     f = open(PRIVATE_KEY_FILEPATH, "w")
     f.write(str(f"{key.PRIVATE_KEY_STRING}\n"))

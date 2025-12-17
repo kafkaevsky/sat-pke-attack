@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 def _evaluate(args):
     os.makedirs("tests", exist_ok=True)
-    if GENERATE_CLEARS_DATA:
+    if EVALUATE_CLEARS_DATA:
         if os.path.isdir("tests") and len(os.listdir("tests")) > 0:
             run_zsh("rm -rf $DATA_DIRECTORY/*")
             print(f"tests directory cleared")
@@ -26,12 +26,12 @@ def _evaluate(args):
         if PLAINTEXT == "r":
             plaintext = random.getrandbits(1)
 
-        i = 0
-        ciphertext_dirpath = f"{"tests"}/cipher_{i}_dir"
+        i = 1
+        ciphertext_dirpath = f"{"tests"}/c_{i}"
         
         while os.path.isdir(ciphertext_dirpath):
             i += 1
-            ciphertext_dirpath = f"{"tests"}/cipher_{i}_dir"
+            ciphertext_dirpath = f"{"tests"}/c_{i}"
         os.mkdir(ciphertext_dirpath)
 
 
