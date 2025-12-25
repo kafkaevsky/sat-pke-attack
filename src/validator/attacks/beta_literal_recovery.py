@@ -58,7 +58,7 @@ def _blr__simple(ciphertext_n__hdf5_file):
         return sorted(beta_literals_sets)
     
 
-def _blr__k_means(ciphertext_n__hdf5_file):
+def _blr__clusters(ciphertext_n__hdf5_file):
 
     if "ciphertext" in ciphertext_n__hdf5_file:
 
@@ -66,24 +66,59 @@ def _blr__k_means(ciphertext_n__hdf5_file):
         ciphertext = ciphertext[:]
         dimensions = max([np.max(m) for m in ciphertext])
 
-        def _monomial_to_vector(m):
+        def _monomial_to_vector(monomial):
             v = [0] * dimensions
-            for l in m:
+            for l in monomial:
                 v[l-1] = 1
             return np.array(v)
-    
-        ciphertext = list(map(_monomial_to_vector, ciphertext))
-        ciphertext_vectors = np.array(ciphertext)
-        ciphertext_vectors_copy = ciphertext
-        # print(ciphertext)
-
-        kmeans = sklearn.cluster.KMeans(n_clusters=BETA, random_state=0, n_init='auto')
-        kmeans.fit(ciphertext_vectors_copy)
-
         
-        # print(sorted(kmeans.cluster_centers_, reverse=True)[:BETA])
-        _retrieve_values = lambda v: sorted(np.argsort(v)[::-1][:K*ALPHA] + 1)
+        def _vector_to_monomial(vector):
+            m = []
+            for i, x in enumerate(vector):
+                if x:
+                    m.append(i)
+            return m
+                
+        
+        def _retrieve_beta_literals(center):
+            for i, v in enumerate(center):
+                if 0>v or v<0.1:
+                    center[i] = 0
+            # print(center)
+            beta_literals_set = sorted(np.argsort(center)[::-1][:K*ALPHA + 1] + 1)
+            beta_literals_set = list(filter(lambda v: center[v-1] > 0, beta_literals_set))
+            print(len(beta_literals_set))
+            return beta_literals_set
+        
+        def _k_means():
+            ciphertext = list(map(_monomial_to_vector, ciphertext))
+            ciphertext_vectors = np.array(ciphertext)
+            kmeans = sklearn.cluster.KMeans(n_clusters=BETA, random_state=0, n_init='auto')
+            kmeans.fit(ciphertext_vectors)
 
-        beta_literals_sets = [_retrieve_values(v) for v in kmeans.cluster_centers_]
+            beta_literals_sets = [_retrieve_beta_literals(center) for center in kmeans.cluster_centers_]
 
-        return beta_literals_sets
+            # print([sorted(x) for x in kmeans.cluster_centers_][0])
+            print(beta_literals_sets)
+
+            return beta_literals_sets
+        
+        def _hdbscan():
+
+            ciphertext_vectors = np.array(list(map(_monomial_to_vector, ciphertext)))
+            clusters = sklearn.cluster.SpectralClustering(n_clusters=BETA, random_state=0)
+            clusters.fit(ciphertext_vectors)
+            labels = clusters.labels_
+
+            beta_literals_sets = [set()] * BETA
+            for i, label in enumerate(labels):
+                beta_literals_sets[label] |= set(_vector_to_monomial(ciphertext_vectors[i]))
+
+            # beta_literals_sets = [_retrieve_beta_literals(center) for center in kmeans.labels]
+            print(beta_literals_sets)
+
+            return beta_literals_sets
+
+        return _hdbscan()
+        
+

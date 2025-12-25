@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 from ..parameters import *
 from ..helpers import *
-from .beta_literal_recovery import _blr__simple, _blr__k_means
+from .beta_literal_recovery import _blr__simple, _blr__clusters
 
 sys.path.append(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -23,7 +23,7 @@ def _recover_plaintext(
 ):
 
     real_beta_literals_sets = ast.literal_eval(beta_literals_sets_n__txt_file.read())
-    recovered_beta_literals_sets = _blr__k_means(ciphertext_n__hdf5_file)
+    recovered_beta_literals_sets = _blr__clusters(ciphertext_n__hdf5_file)
     # if real_beta_literals_sets != recovered_beta_literals_sets:
     #     return -1
 
