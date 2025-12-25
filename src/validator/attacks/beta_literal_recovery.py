@@ -111,16 +111,14 @@ def _blr__clusters(ciphertext_n__hdf5_file):
             clusters.fit(ciphertext_vectors)
             labels = clusters.labels_
 
-            # beta_literals_sets = [set()] * BETA
             beta_literals_sets_counts = defaultdict(set)
             for i, label in enumerate(labels):
                 beta_literals_sets_counts[label] |= set(_vector_to_monomial(ciphertext_vectors[i]) + 1)
 
-            # beta_literals_sets_counts = [Counter(s) for s in beta_literals_sets_counts.values()]
+            beta_literals_sets = []
             for x in beta_literals_sets_counts.values():
-                print(np.sort(np.fromiter(x, dtype=np.int64).astype(int)))
-
-            return beta_literals_sets_counts
+                beta_literals_sets.append(np.sort(np.fromiter(x, dtype=np.int64).astype(int)))
+            return beta_literals_sets
 
         return _spectral_clustering()
         
