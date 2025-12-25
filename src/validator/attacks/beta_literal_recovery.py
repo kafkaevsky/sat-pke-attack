@@ -1,3 +1,4 @@
+from collections import Counter, defaultdict
 from matplotlib.pylab import beta
 import numpy as np
 import sklearn
@@ -77,7 +78,7 @@ def _blr__clusters(ciphertext_n__hdf5_file):
             for i, x in enumerate(vector):
                 if x:
                     m.append(i)
-            return m
+            return np.array(m)
                 
         
         def _retrieve_beta_literals(center):
@@ -103,22 +104,24 @@ def _blr__clusters(ciphertext_n__hdf5_file):
 
             return beta_literals_sets
         
-        def _hdbscan():
+        def _spectral_clustering():
 
             ciphertext_vectors = np.array(list(map(_monomial_to_vector, ciphertext)))
-            clusters = sklearn.cluster.SpectralClustering(n_clusters=BETA, random_state=0)
+            clusters = sklearn.cluster.SpectralClustering(n_clusters=BETA, random_state=0, affinity='nearest_neighbors')
             clusters.fit(ciphertext_vectors)
             labels = clusters.labels_
 
-            beta_literals_sets = [set()] * BETA
+            # beta_literals_sets = [set()] * BETA
+            beta_literals_sets_counts = defaultdict(set)
             for i, label in enumerate(labels):
-                beta_literals_sets[label] |= set(_vector_to_monomial(ciphertext_vectors[i]))
+                beta_literals_sets_counts[label] |= set(_vector_to_monomial(ciphertext_vectors[i]) + 1)
 
-            # beta_literals_sets = [_retrieve_beta_literals(center) for center in kmeans.labels]
-            print(beta_literals_sets)
+            # beta_literals_sets_counts = [Counter(s) for s in beta_literals_sets_counts.values()]
+            for x in beta_literals_sets_counts.values():
+                print(np.sort(np.fromiter(x, dtype=np.int64).astype(int)))
 
-            return beta_literals_sets
+            return beta_literals_sets_counts
 
-        return _hdbscan()
+        return _spectral_clustering()
         
 
