@@ -8,7 +8,7 @@ from ..parameters import *
 from ..helpers import *
 import matplotlib.pyplot as plt
 
-def _blr__simple(ciphertext_n__hdf5_file):
+def _blr__naive(ciphertext_n__hdf5_file):
     if "ciphertext" in ciphertext_n__hdf5_file:
 
         ciphertext = ciphertext_n__hdf5_file["ciphertext"]
@@ -80,29 +80,23 @@ def _blr__clusters(ciphertext_n__hdf5_file):
                 if x:
                     m.append(i)
             return np.array(m)
-                
-        
-        def _retrieve_beta_literals(center):
-            for i, v in enumerate(center):
-                if 0>v or v<0.1:
-                    center[i] = 0
-            # print(center)
-            beta_literals_set = sorted(np.argsort(center)[::-1][:K*ALPHA + 1] + 1)
-            beta_literals_set = list(filter(lambda v: center[v-1] > 0, beta_literals_set))
-            # print(len(beta_literals_set))
-            return beta_literals_set
         
         def _k_means():
+
+            def _retrieve_beta_literals(center):
+                for i, v in enumerate(center):
+                    if 0>v or v<0.1:
+                        center[i] = 0
+                beta_literals_set = sorted(np.argsort(center)[::-1][:K*ALPHA + 1] + 1)
+                beta_literals_set = list(filter(lambda v: center[v-1] > 0, beta_literals_set))
+                return beta_literals_set
+    
             ciphertext = list(map(_monomial_to_vector, ciphertext))
             ciphertext_vectors = np.array(ciphertext)
             kmeans = sklearn.cluster.KMeans(n_clusters=BETA, random_state=0, n_init='auto')
             kmeans.fit(ciphertext_vectors)
 
             beta_literals_sets = [_retrieve_beta_literals(center) for center in kmeans.cluster_centers_]
-
-            # print([sorted(x) for x in kmeans.cluster_centers_][0])
-            # print(beta_literals_sets)
-
             return beta_literals_sets
         
         def _spectral_clustering():
@@ -119,7 +113,6 @@ def _blr__clusters(ciphertext_n__hdf5_file):
             beta_literals_sets = []
             for x in beta_literals_sets_counts.values():
                 beta_literals_sets.append(np.sort(np.fromiter(x, dtype=np.int64).astype(int)))
-                print("HI", file=sys.stderr)
             return beta_literals_sets
 
         return _spectral_clustering()

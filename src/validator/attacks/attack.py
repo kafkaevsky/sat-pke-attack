@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 from ..parameters import *
 from ..helpers import *
-from .beta_literal_recovery import _blr__simple, _blr__clusters
+from .beta_literal_recovery import _blr__naive, _blr__clusters
 
 sys.path.append(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
