@@ -12,11 +12,13 @@ BETA = 3  # Number of clauses per row.
 ALPHA = 10  # Number of rows.
 
 ### Encryption invariants [Section 2.2]
+CONDITIONS_B_C = True
+CONDITION_A = True
 # A) Clauses within one tuple ("beta groupings") share variables. [Discussed in Section 3.1.2]
 # B) Tuples share at least one clause with another tuple. [Discussed in Section 3.2]
 # C) Each clause of public key appears in some tuple. [Discussed in Section 3.3]
-CONDITION_A = False
-CONDITIONS_B_C = True
+# Note that CONDITION_A is only defined by the paper for when CONDITIONS_B_C = True
+# i.e. the constant CONDITION_A may be True only if CONDITIONS_B_C is True
 
 ### Attack parameters
 import math

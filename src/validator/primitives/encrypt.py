@@ -3,7 +3,6 @@ import os
 from . import key
 import argparse
 import secrets
-import random
 from itertools import chain as flatten
 from collections import Counter
 import numpy as np
@@ -18,15 +17,25 @@ secure = secrets.SystemRandom()
 
 
 def generate_j_map():
+
+    j_map = [secure.sample(range(M), BETA) for _ in range(ALPHA)]
+
     if CONDITIONS_B_C:
         if ALPHA != M:
-            raise ValueError()
+            raise ValueError("α must equal m with conditions B and C")
+        
         s = list(range(M))
-        secure.shuffle(s)
+        if CONDITION_A:
+            pass
+        else:
+            secure.shuffle(s)
+        
+        j_map = [
+            [s[(i + a - 1) % M] for a in range(1, BETA + 1)]
+            for i in range(1, ALPHA + 1)
+        ]
 
-        return [[s[(i + a - 1) % M] for a in range(1, BETA+1)] for i in range(1, ALPHA+1)]
-
-    return [secure.sample(range(M), BETA) for _ in range(ALPHA)]
+    return j_map
 
 
 def _encrypt(args):

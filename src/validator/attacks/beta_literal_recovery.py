@@ -117,4 +117,30 @@ def _blr__clusters(ciphertext_n__hdf5_file):
 
         return _spectral_clustering()
         
+def _new__n4(ciphertext_n__hdf5_file, public_key__txt_file):
+
+
+    if "ciphertext" in ciphertext_n__hdf5_file:
+
+        ciphertext = ciphertext_n__hdf5_file["ciphertext"]
+        ciphertext = np.array(ciphertext[:])
+        ciphertext = map(tuple, ciphertext)
+
+        
+
+
+
+
+        # FIRST, create set of all triples of (clause, monomial1, monomial2)
+        # where clause is from the public key, and monomial1 and monomial2 are from the ciphertext
+
+        # SECOND, for each, define a clause group that consists of all clauses fully
+        # contained in that triple
+
+        # THIRD, use the set of all clause groups as the beta literals sets list
+        # in the attack
+
+        # We will get ~n^3 groups, but this is okay!
+
+
 
