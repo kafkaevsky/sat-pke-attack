@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import h5py
+import ast
 import numpy as np
 from itertools import combinations
 from ..parameters import *
@@ -13,7 +14,7 @@ sys.path.append(
 )
 
 
-def _literals_sets(ciphertext_file, clauses_file):
+def _variables_sets(ciphertext_file, clauses_file):
 
     if "ciphertext" in ciphertext_file:
 
@@ -21,46 +22,60 @@ def _literals_sets(ciphertext_file, clauses_file):
         # 1
         #########
 
-        c = [set(x) for x in ciphertext_file["ciphertext"][:]]
-        s = [set().union(*subset) for subset in combinations(c, 2)]
+        ciphertext = [set(x) for x in ciphertext_file["ciphertext"][:][:50]]
+        s = [set().union(*subset) for subset in combinations(ciphertext, 2)]
 
         #########
         # 2
         #########
 
-        def contained(monomial, literal):
-            return literal in monomial
+        def variable_contained(monomial, variable):
+            return variable in monomial
 
         r = np.arange(2, N + 2)
         shared = dict(
             zip(
                 r,
-                [set().union(*filter(partial(contained, literal=l), c)) for l in r],
+                [
+                    set().union(
+                        *filter(partial(variable_contained, variable=l), ciphertext)
+                    )
+                    for l in r
+                ],
             )
         )
 
-        # s2 = [[subset.union(shared.get(v, set())) for v in subset] for subset in s]
-        print(len(s))
-        s2 = [[subset.union(shared.get(v, set())) for v in subset] for subset in s]
-        for subset in s2:
-            print(subset, "\n")
+        s2 = set(
+            flatten(
+                *[
+                    [
+                        tuple(sorted(set().union(subset, shared.get(variable, set()))))
+                        for variable in subset
+                    ]
+                    for subset in s
+                ]
+            )
+        )
 
-        # For each variable in s,
-        # for each clause from the public key that shares a variable with s,
-        # union the variables in that clause with s.
+        clauses = np.array(ast.literal_eval(clauses_file.read()))
+        clauses_variables_only = np.fromiter(
+            map(lambda c: c.T[0], clauses), dtype=object
+        )
 
-        # s2 = [
-        #     set(np.concatenate(x))  # .union()
-        #     # a         ->
-        #     # b         ->
-        #     # c         ->
-        #     for x in combinations(s, 2)
-        # ]
+        t1 = [
+            filter(lambda m: set(m).issubset(set(subset)), clauses_variables_only)
+            for subset in s2
+        ]
+
+        for c in t1:
+            negative_anf = list(cnf_to_neg_anf(list(c)))
+            for monomial in negative_anf:
+                pass
 
 
 def _recover_plaintext(ciphertext_file, clauses_file):
 
-    clauses = _literals_sets(ciphertext_file, clauses_file)
+    clauses = _variables_sets(ciphertext_file, clauses_file)
 
     # rows = len(a_terms.keys())
     # cols = coefficient_count
