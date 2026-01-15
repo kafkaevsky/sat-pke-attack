@@ -109,6 +109,7 @@ def _recover_plaintext(
         if missing_terms == {tuple()}:
             return 1
         return -3
+
     
 
     rows = len(a_terms.keys())
