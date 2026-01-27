@@ -25,22 +25,18 @@ def _variables_sets(ciphertext_file, public_key_file):
 
     public_key_incl_sign = [tuple(c) for c in ast.literal_eval(public_key_file.read())]
     public_key = [(tuple(zip(*c))[0], c) for c in public_key_incl_sign]
-    ciphertext = set(tuple(m) for m in ciphertext_file["ciphertext"][:])
+    ciphertext = {tuple(m) for m in ciphertext_file["ciphertext"]}
 
-    ciphertext_generator = (set((int(v) for v in m)) for m in ciphertext)
-    s = (subset[0] | subset[1] for subset in combinations(ciphertext_generator, 2))
+    ciphertext_var_sets = [set((int(v) for v in m)) for m in ciphertext]
+    s = (subset1 | subset2 for subset1, subset2 in combinations(ciphertext_var_sets, 2))
 
     print(0)
 
-    clauses_sharing_variable__dict = dict(
-        [
-            (
-                v,
-                set(filter(lambda m: v in m[0], public_key)),
-            )
-            for v in range(2, N + 2)
+    clauses_sharing_variable__dict = {}
+    for v in range(2, N + 2):
+        clauses_sharing_variable__dict[v] = [
+            (set(c[0]), c) for c in public_key if v in c[0]
         ]
-    )
 
     print(clauses_sharing_variable__dict)
 
@@ -48,7 +44,7 @@ def _variables_sets(ciphertext_file, public_key_file):
 
     s_prime = (
         (
-            s_i | set().union(*(set(c[0]) for c in clauses_sharing_variable__dict[v]))
+            s_i | set().union(*(c[0] for c in clauses_sharing_variable__dict[v]))
             for v in s_i
         )
         for s_i in s
@@ -58,15 +54,13 @@ def _variables_sets(ciphertext_file, public_key_file):
 
     def get_clause_group(s_prime_i_vars__set):
 
-        beta_group_superset = flatten(
-            *(clauses_sharing_variable__dict[v] for v in s_prime_i_vars__set)
-        )
+        beta_group = set()
+        for v in s_prime_i_vars__set:
+            for c in clauses_sharing_variable__dict[v]:
+                if c[0] <= s_prime_i_vars__set:
+                    beta_group.add(c[1])
 
-        beta_group = list(
-            filter(lambda c: set(c[0]) <= s_prime_i_vars__set, beta_group_superset)
-        )
-
-        return beta_group
+        return list(beta_group)
 
     t = (get_clause_group(s_prime_i) for s_prime_i in flatten.from_iterable(s_prime))
 
@@ -77,8 +71,8 @@ def _variables_sets(ciphertext_file, public_key_file):
         keep = False
 
         ######### 1
-        
-        c_1_incl_sign = t_i[1]
+
+        c_1_incl_sign = t_i[0][1]
         neg_anf = cnf_to_neg_anf(list(c_1_incl_sign))
         m_star = set(secure.choice(neg_anf))
 
@@ -86,51 +80,28 @@ def _variables_sets(ciphertext_file, public_key_file):
 
         t_i_all_vars = set(flatten(*(c[0] for c in t_i)))
         vars_excluding_c_1 = list(t_i_all_vars - m_star)
+        r = len(vars_excluding_c_1)
 
         ######### 3
 
-        sampled_count = 0
-        sampled_monomials = []
-        appeared_count = 0
+        count = min(100, 2 ** r)
+        samples = secure.sample(range(2 ** len(vars_excluding_c_1)), count)
+        hits = 0
 
-        def _sample():
-            m = secure.sample(
-                vars_excluding_c_1,
-                secure.randint(0, len(vars_excluding_c_1))
-            )
+        for sample in samples:
 
-            return tuple(np.array(sorted(m)))
-        
-        sample_size = min(
-            100,
-            2 ** len(vars_excluding_c_1)
-        )
-        
-
-        for _ in range(sample_size):
-
-            m = _sample()
-            while (m in sampled_monomials):
-                m = _sample()
-
-            appeared_count += int(m in ciphertext)
-            sampled_count += 1
-            sampled_monomials.append(m)
-
-            ######### 4
-
-            if appeared_count >= 30:
+            m_indices = [i for i, b in enumerate(f"{bin(sample)[2:]:0>{r}}") if int(b)]
+            m = tuple(sorted(vars_excluding_c_1[i] for i in m_indices))
+            hits += int(m in ciphertext)
+            if hits >= 30:
                 keep = True
                 break
-            if sampled_count >= 100:
-                break
-        
+
         print(keep)
         if keep:
             t_prime.append(t_i)
 
     print(t_prime)
-
 
 
 def _linearization(ciphertext_file, public_key_file):
