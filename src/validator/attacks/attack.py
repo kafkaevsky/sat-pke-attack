@@ -27,16 +27,15 @@ def _variables_sets(ciphertext_file, public_key_file):
     public_key = [(tuple(zip(*c))[0], c) for c in public_key_incl_sign]
     ciphertext = {tuple(m) for m in ciphertext_file["ciphertext"]}
 
-    ciphertext_var_sets = [set((int(v) for v in m)) for m in ciphertext]
+    ciphertext_var_sets = [set(int(v) for v in m) for m in ciphertext]
     s = (subset1 | subset2 for subset1, subset2 in combinations(ciphertext_var_sets, 2))
 
     print(0)
 
-    clauses_sharing_variable__dict = {}
-    for v in range(2, N + 2):
-        clauses_sharing_variable__dict[v] = [
-            (set(c[0]), c) for c in public_key if v in c[0]
-        ]
+    clauses_sharing_variable__dict = {
+        v: [(set(c[0]), c) for c in public_key if v in c[0]]
+        for v in range(2, N + 2)
+    }
 
     print(clauses_sharing_variable__dict)
 
@@ -85,17 +84,18 @@ def _variables_sets(ciphertext_file, public_key_file):
         ######### 3
 
         count = min(100, 2 ** r)
-        samples = secure.sample(range(2 ** len(vars_excluding_c_1)), count)
+        sample_space = 2 ** r
         hits = 0
 
-        for sample in samples:
-
-            m_indices = [i for i, b in enumerate(f"{bin(sample)[2:]:0>{r}}") if int(b)]
+        for sample in secure.sample(range(sample_space), count):
+            m_indices = [i for i, b in enumerate(f"{bin(sample)[2:]:0>{r}}") if b == '1']
             m = tuple(sorted(vars_excluding_c_1[i] for i in m_indices))
-            hits += int(m in ciphertext)
-            if hits >= 30:
-                keep = True
-                break
+            if m in ciphertext:
+                hits += 1
+                if hits >= 30:
+                    keep = True
+                    break
+
 
         print(keep)
         if keep:

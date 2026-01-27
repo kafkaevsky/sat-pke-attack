@@ -2,8 +2,7 @@ import subprocess
 import numpy as np
 from itertools import chain as flatten, combinations as subset, product as cartesian
 
-CONSTANT_MONOMIAL = tuple()  # empty tuple
-
+CONSTANT_MONOMIAL = tuple()  # empty tuple for constant 1
 
 class Coefficient:
     def __init__(self, v):
@@ -35,10 +34,7 @@ def distribute(iterable):
 def product_simplify(a: list, b: list):
     a = np.fromiter(a, dtype=tuple)
     b = np.fromiter(b, dtype=tuple)
-    x_array, y_array = np.meshgrid(a, b)
-    product = np.fromiter(zip(x_array.ravel(), y_array.ravel()), dtype=tuple)
-    product = [set(flatten(*t)) for t in product]
-    return product
+    return [set(flatten(x, y)) for x in a for y in b]
 
 
 def cnf_to_neg_anf(term: list):
