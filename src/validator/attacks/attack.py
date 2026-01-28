@@ -9,9 +9,7 @@ from itertools import combinations, product as cartesian
 import galois
 from ..parameters import *
 from ..helpers import *
-import secrets
-
-secure = secrets.SystemRandom()
+import random
 
 sys.path.append(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -27,11 +25,37 @@ def _variables_sets(ciphertext_file, public_key_file, attempt_number):
     public_key = [(tuple(zip(*c))[0], c) for c in public_key_incl_sign]
     ciphertext = {tuple(m) for m in ciphertext_file["ciphertext"]}
 
-    ciphertext_var_sets = [frozenset(int(v) for v in m) for m in ciphertext]
-    s = set()
-    for i in range(len(ciphertext_var_sets)):
-        for j in range(i, len(ciphertext_var_sets)):
-            s.add(ciphertext_var_sets[i] | ciphertext_var_sets[j])
+
+    var_to_bit = {v: 1 << (v - 2) for v in range(2, N + 2)}
+    bit_to_var = {b: v for v, b in var_to_bit.items()}
+
+    unique_masks_set = set()
+
+    for m in ciphertext:
+        mask = 0
+        for v in m:
+            mask |= var_to_bit[v]
+        unique_masks_set.add(mask)
+    
+    unique_masks_list = list(unique_masks_set)
+    results = set()
+    
+    for i in range(len(unique_masks_list)):
+        mask_a = unique_masks_list[i]
+        for j in range(i, len(unique_masks_list)):
+            mask_b = unique_masks_list[j]
+
+            results.add(mask_a | mask_b)
+            
+    s = []
+    for bitmapped_subset in results:
+        current_vars = []
+        for b, v in bit_to_var.items():
+            if bitmapped_subset & b:
+                current_vars.append(v)
+        s.append(set(current_vars))
+
+
 
     print(0)
 
@@ -76,7 +100,6 @@ def _variables_sets(ciphertext_file, public_key_file, attempt_number):
     t_prime = []
 
     for i, t_i in enumerate(t):
-        # print(i)
 
         keep = False
 
@@ -84,7 +107,7 @@ def _variables_sets(ciphertext_file, public_key_file, attempt_number):
 
         c_1_incl_sign = t_i[0][1]
         neg_anf = cnf_to_neg_anf(list(c_1_incl_sign))
-        m_star = set(secure.choice(neg_anf))
+        m_star = set(random.choice(neg_anf))
 
         ######### 2
 
@@ -98,36 +121,14 @@ def _variables_sets(ciphertext_file, public_key_file, attempt_number):
         HIT_THRESHOLD = 0.3 * SAMPLE_COUNT
 
         count = min(SAMPLE_COUNT, 2**r)
-
-
-        ### APPROACH 2
-
-        # hits = 0
-        # samples = set()
-
-        # for _ in range(count):
-        #     m = [v for v in vars_excluding_c_1 if secure.random() < 0.5]
-        #     m = tuple(sorted(m))
-        #     if m in samples:
-        #         continue
-        #     samples.add(m)
-        #     if m in ciphertext:
-        #         hits += 1
-        #     if hits >= HIT_THRESHOLD:
-        #         keep = True
-        #         break
-
-        ### APPROACH 1
-
-        count = min(SAMPLE_COUNT, 2**r)
         sample_space = 2**r
         hits = 0
 
         seen_samples = set()
         samples_drawn = 0
-        
+
         while samples_drawn < count:
-            sample = secrets.randbelow(sample_space)
+            sample = random.randrange(sample_space)
             if sample in seen_samples:
                 continue
 
@@ -139,8 +140,8 @@ def _variables_sets(ciphertext_file, public_key_file, attempt_number):
             if m in ciphertext:
                 hits += 1
             if hits >= HIT_THRESHOLD:
-                    keep = True
-                    break
+                keep = True
+                break
 
         print(keep)
         if keep:
