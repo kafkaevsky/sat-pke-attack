@@ -27,8 +27,11 @@ def _variables_sets(ciphertext_file, public_key_file, attempt_number):
     public_key = [(tuple(zip(*c))[0], c) for c in public_key_incl_sign]
     ciphertext = {tuple(m) for m in ciphertext_file["ciphertext"]}
 
-    ciphertext_var_sets = [set(int(v) for v in m) for m in ciphertext]
-    s = (subset1 | subset2 for subset1, subset2 in combinations(ciphertext_var_sets, 2))
+    ciphertext_var_sets = [frozenset(int(v) for v in m) for m in ciphertext]
+    s = set()
+    for i in range(len(ciphertext_var_sets)):
+        for j in range(i, len(ciphertext_var_sets)):
+            s.add(ciphertext_var_sets[i] | ciphertext_var_sets[j])
 
     print(0)
 
