@@ -26,8 +26,11 @@ def main():
             Run `source venv/bin/activate && maturin develop --manifest-path src/validator/attacks/retrieve_rs/Cargo.toml`"""
         )
     
-    res = retrieve_rs.retrieve([[2, 3, 4], [6], [5, 5], [7, 3]], 10)
-    print([bin(x) for x in res])
+    ct = [[2, 3, 4], [6], [5, 5], [7, 3]]
+    pk = [[(1, 1), (2, 0), (3, 1)], [(2, 0), (3, 1), (4, 0)], [(4, 0), (5, 1), (6, 1)], [(6, 1), (1, 1), (3, 0)]]
+    n = 10
+    res = retrieve_rs.retrieve(ct, pk, n)
+    print(res)
 
     CIPHERTEXT_DIRPATH = f"tests/c_{args.i}"
     CIPHERTEXT_FILEPATH = f"{CIPHERTEXT_DIRPATH}/ciphertext_{args.i}.hdf5"

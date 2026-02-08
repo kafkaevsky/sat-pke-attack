@@ -2,8 +2,11 @@ use pyo3::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 #[pyfunction]
-pub fn retrieve(ciphertext: Vec<Vec<u128>>, n: u128) -> PyResult<HashSet<u128>> {
-
+pub fn retrieve(
+    ciphertext: Vec<Vec<u128>>,
+    public_key: Vec<Vec<Vec<u64>>>,
+    n: u128,
+) -> PyResult<HashMap<u64, Vec<Vec<u64>>>> {
     // ================================
     //      Step 1
     // ================================
@@ -40,6 +43,27 @@ pub fn retrieve(ciphertext: Vec<Vec<u128>>, n: u128) -> PyResult<HashSet<u128>> 
     //      Step 2
     // ================================
 
+    let mut public_key_vars_only: Vec<Vec<u64>> = Vec::new();
+    for c in public_key {
+        let mut clause_vars: Vec<u64> = Vec::new();
+        for v in c {
+            clause_vars.push(v[0].clone());
+        }
+        public_key_vars_only.push(clause_vars);
+    }
+
+    let mut clauses_sharing_variable: HashMap<u64, Vec<Vec<u64>>> = HashMap::new();
+    for i in 2..(n as u64) + 2 {
+        clauses_sharing_variable.insert(
+            i,
+            public_key_vars_only
+                .iter()
+                .filter(|c| c.contains(&i))
+                .cloned()
+                .collect(),
+        );
+    }
+
     // ================================
     //      Step 3
     // ================================
@@ -47,7 +71,7 @@ pub fn retrieve(ciphertext: Vec<Vec<u128>>, n: u128) -> PyResult<HashSet<u128>> 
     // ================================
     //      Step 4
     // ================================
-    Ok(combination_masks)
+    Ok(clauses_sharing_variable)
 }
 
 #[pymodule]
