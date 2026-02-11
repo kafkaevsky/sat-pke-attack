@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use pyo3::prelude::*;
+use rand::seq::SliceRandom;
 use std::collections::{HashMap, HashSet};
 
 #[pyclass]
@@ -12,6 +13,8 @@ pub struct FormattedElement {
 }
 
 const INDEX_0_OFFSET: u64 = 2;
+const MAX_SAMPLES: usize = 100;
+const SAMPLE_THRESHOLD: usize = 30;
 
 fn encode_bit_vector(m: Vec<u64>) -> u128 {
     let mut b: u128 = 0b0;
@@ -20,6 +23,7 @@ fn encode_bit_vector(m: Vec<u64>) -> u128 {
     }
     b
 }
+
 fn decode_bit_vector(v: u128) -> Vec<u64> {
     let mut m: Vec<u64> = Vec::new();
     for i in 0..128 {
@@ -28,6 +32,18 @@ fn decode_bit_vector(v: u128) -> Vec<u64> {
         }
     }
     m
+}
+
+fn set_union(a: u128, b: u128) -> u128 {
+    return a | b;
+}
+
+fn set_intersection(a: u128, b: u128) -> u128 {
+    return a & b;
+}
+
+fn set_issubset(a: u128, b: u128) -> bool {
+    return a & !b == 0;
 }
 
 #[pyfunction]
@@ -49,7 +65,6 @@ pub fn retrieve(
         let encoding: u128 = encode_bit_vector(vec![i]);
         var_to_bit.insert(i, encoding);
         bit_to_var.insert(encoding, i);
-
     }
 
     let mut unique_masks: HashSet<u128> = HashSet::new();
@@ -168,12 +183,46 @@ pub fn retrieve(
     // ========
     // 4.i.
     // ========
+    let mut t_prime_subset_of_t: Vec<Vec<Vec<(u64, u64)>>> = Vec::new();
 
     for t_i in t_contained_by_clauses {
         let c_1 = &t_i[0];
-        let mut anf_c_1: Vec<Vec<u64>> = cnf_to_neg_anf(&c_1);
+        let anf_c_1: Vec<Vec<u64>> = cnf_to_neg_anf(&c_1);
         let chosen_monomial: Vec<u64> = anf_c_1[0].clone();
-        println!("{:b}", encode_bit_vector(chosen_monomial));
+        let m_prime_encoded_monomial: u128 = encode_bit_vector(chosen_monomial);
+
+        let mut s_union_of_other_vars: u128 = 0b0;
+        for c_i in &t_i[1..] {
+            let anf_c_i = cnf_to_neg_anf(&c_i);
+            for m in anf_c_i {
+                s_union_of_other_vars |= encode_bit_vector(m);
+            }
+        }
+        s_union_of_other_vars = set_intersection(s_union_of_other_vars, !m_prime_encoded_monomial);
+
+        let other_vars: Vec<u64> = decode_bit_vector(s_union_of_other_vars);
+
+        let mut shuffled_supported_monomials: Vec<Vec<u64>> = other_vars
+            .iter()
+            .copied()
+            .powerset()
+            .collect();
+        let mut rng = rand::rng();
+        shuffled_supported_monomials.shuffle(&mut rng);
+
+        let mut appearances = 0;
+        for (i, m_i) in shuffled_supported_monomials.iter().enumerate() {
+            if i >= MAX_SAMPLES {
+                break;
+            }
+            if appearances >= SAMPLE_THRESHOLD {
+                break;
+            }
+            println!("{:?}", encode_bit_vector(m_i.clone()));
+        }
+        // println!("m_prime_encoded_monomial, {}", m_prime_encoded_monomial);
+        // println!("s_union_of_other_vars, {}", s_union_of_other_vars);
+        // println!("Decoded s_union, {:?}", decode_bit_vector(s_union_of_other_vars));
     }
 
     // ========

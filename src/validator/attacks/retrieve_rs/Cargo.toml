@@ -10,3 +10,4 @@ crate-type = ["cdylib"]
 [dependencies]
 itertools = "0.14.0"
 pyo3 = { version = "0.21", features = ["extension-module"] }
+rand = "0.10.0"
