@@ -11,12 +11,30 @@ pub struct FormattedElement {
     vars: u128,
 }
 
+const INDEX_0_OFFSET: u64 = 2;
+
+fn encode_bit_vector(m: Vec<u64>) -> u128 {
+    let mut b: u128 = 0b0;
+    for v in m {
+        b |= 1 << v - INDEX_0_OFFSET;
+    }
+    b
+}
+fn decode_bit_vector(v: u128) -> Vec<u64> {
+    let mut m: Vec<u64> = Vec::new();
+    for i in 0..128 {
+        if 1 << i & v != 0 {
+            m.push(i + INDEX_0_OFFSET);
+        }
+    }
+    m
+}
+
 #[pyfunction]
 pub fn retrieve(
     ciphertext: Vec<Vec<u64>>,
     public_key: Vec<Vec<(u64, u64)>>,
     n: u128,
-    // ) -> PyResult<HashMap<u64, Vec<Vec<u64>>>> {
 ) -> PyResult<Vec<FormattedElement>> {
     // ================================
     //      Step 1
@@ -24,14 +42,15 @@ pub fn retrieve(
     if n > 128 {
         panic!("`N` was {}, must be <= 128", n);
     }
+
     let mut var_to_bit: HashMap<u64, u128> = HashMap::new();
     let mut bit_to_var: HashMap<u128, u64> = HashMap::new();
-    for i in 0..n as u64 {
-        let v: u128 = 1 << i;
-        var_to_bit.insert(i + 2, v);
-        bit_to_var.insert(v, i + 2);
+    for i in 2..(n as u64) + 2 {
+        let encoding: u128 = encode_bit_vector(vec![i]);
+        var_to_bit.insert(i, encoding);
+        bit_to_var.insert(encoding, i);
+
     }
-    // println!("v2b {:?}", var_to_bit);
 
     let mut unique_masks: HashSet<u128> = HashSet::new();
     for m in ciphertext {
@@ -122,6 +141,10 @@ pub fn retrieve(
         }
     }
 
+    // ================================
+    //      Step 4
+    // ================================
+
     fn cnf_to_neg_anf(clause: &Vec<(u64, u64)>) -> Vec<Vec<u64>> {
         println!("========");
         let mut clause_iterable_negated: Vec<Vec<u64>> = vec![vec![1]];
@@ -142,14 +165,20 @@ pub fn retrieve(
         neg_anf_simplified
     }
 
+    // ========
+    // 4.i.
+    // ========
+
     for t_i in t_contained_by_clauses {
         let c_1 = &t_i[0];
         let mut anf_c_1: Vec<Vec<u64>> = cnf_to_neg_anf(&c_1);
+        let chosen_monomial: Vec<u64> = anf_c_1[0].clone();
+        println!("{:b}", encode_bit_vector(chosen_monomial));
     }
 
-    // ================================
-    //      Step 4
-    // ================================
+    // ========
+    // 4.ii.
+    // ========
 
     Ok(public_key_formatted)
 }
