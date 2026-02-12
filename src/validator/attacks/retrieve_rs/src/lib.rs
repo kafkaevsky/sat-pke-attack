@@ -1,6 +1,8 @@
 use itertools::Itertools;
 use pyo3::prelude::*;
 use rand::seq::SliceRandom;
+use rand::RngExt;
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 #[pyclass]
@@ -19,7 +21,7 @@ const SAMPLE_THRESHOLD: usize = 30;
 fn encode_bit_vector(m: Vec<u64>) -> u128 {
     let mut b: u128 = 0b0;
     for v in m {
-        b |= 1 << v - INDEX_0_OFFSET;
+        b |= 1u128 << (v - INDEX_0_OFFSET);
     }
     b
 }
@@ -59,15 +61,15 @@ pub fn retrieve(
         panic!("`N` was {}, must be <= 128", n);
     }
 
-    let mut var_to_bit: HashMap<u64, u128> = HashMap::new();
-    let mut bit_to_var: HashMap<u128, u64> = HashMap::new();
+    let mut var_to_bit: HashMap<u64, u128> = HashMap::with_capacity(n as usize);
+    let mut bit_to_var: HashMap<u128, u64> = HashMap::with_capacity(n as usize);
     for i in 2..(n as u64) + 2 {
         let encoding: u128 = encode_bit_vector(vec![i]);
         var_to_bit.insert(i, encoding);
         bit_to_var.insert(encoding, i);
     }
 
-    let mut unique_masks: HashSet<u128> = HashSet::new();
+    let mut unique_masks: HashSet<u128> = HashSet::with_capacity(ciphertext.len());
     for m in ciphertext {
         let mut mask: u128 = 0b0;
         for v in m {
@@ -76,20 +78,27 @@ pub fn retrieve(
         unique_masks.insert(mask);
     }
 
-    let unique_masks_vec: Vec<u128> = unique_masks.into_iter().collect();
+    eprintln!("unique_masks: {}", unique_masks.len());
 
-    let mut s_combination_masks: HashSet<u128> = HashSet::new();
-    for (i, mask_a) in unique_masks_vec.iter().enumerate() {
-        for mask_b in &unique_masks_vec[i + 1..] {
-            s_combination_masks.insert(mask_a | mask_b);
-        }
-    }
+    let unique_masks_vec: Vec<u128> = unique_masks.iter().copied().collect();
+
+    let s_combination_masks: HashSet<u128> = (0..unique_masks_vec.len())
+        .into_par_iter()
+        .flat_map(|i| {
+            unique_masks_vec[i + 1..]
+                .iter()
+                .map(|mask_b| unique_masks_vec[i] | mask_b)
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    eprintln!("s_combination_masks: {}", s_combination_masks.len());
 
     // ================================
     //      Step 2
     // ================================
 
-    let mut public_key_formatted: Vec<FormattedElement> = Vec::new();
+    let mut public_key_formatted: Vec<FormattedElement> = Vec::with_capacity(public_key.len());
     for c in public_key {
         let mut vars_extracted: u128 = 0;
         for v in &c {
@@ -104,64 +113,65 @@ pub fn retrieve(
 
     let mut clauses_sharing_variable: HashMap<u64, (Vec<FormattedElement>, u128)> = HashMap::new();
     for i in 2..(n as u64) + 2 {
-        let clauses_vec: Vec<FormattedElement> = public_key_formatted
-            .iter()
-            .filter(|c| c.vars & (var_to_bit[&i]) > 0)
-            .cloned()
-            .collect();
-        clauses_sharing_variable.insert(
-            i,
-            (
-                clauses_vec.clone(),
-                clauses_vec
-                    .into_iter()
-                    .fold(0, |var_set, x| var_set | x.vars),
-            ),
-        );
+        let mut union_vars: u128 = 0;
+        let mut clauses_vec: Vec<FormattedElement> = Vec::new();
+        for c in &public_key_formatted {
+            if c.vars & var_to_bit[&i] != 0 {
+                union_vars |= c.vars;
+                clauses_vec.push(c.clone());
+            }
+        }
+        clauses_sharing_variable.insert(i, (clauses_vec, union_vars));
     }
 
-    let mut s_prime_expanded_from_s: HashSet<u128> = HashSet::new();
-    for s_i in s_combination_masks {
-        // println!("HEY {:b}", s_i);
-        let mut b = s_i.clone();
-        while b != 0 {
-            let var: u64 = b.trailing_zeros().into();
-            b &= b - 1;
-            s_prime_expanded_from_s.insert(s_i | clauses_sharing_variable[&var].1);
-        }
-    }
+    let s_prime_expanded_from_s: HashSet<u128> = s_combination_masks
+        .par_iter()
+        .flat_map(|&s_i| {
+            let mut results = Vec::new();
+            let mut b = s_i;
+            while b != 0 {
+                let var = (b.trailing_zeros() as u64) + INDEX_0_OFFSET;
+                b &= b - 1;
+                results.push(s_i | clauses_sharing_variable[&var].1);
+            }
+            results
+        })
+        .collect();
+
+    eprintln!("s_prime_expanded_from_s: {}", s_prime_expanded_from_s.len());
 
     // ================================
     //      Step 3
     // ================================
 
-    let mut t_contained_by_clauses: Vec<Vec<Vec<(u64, u64)>>> = Vec::new();
+    let mut t_contained_by_clauses: Vec<Vec<FormattedElement>> = Vec::new();
     for s_prime_i in s_prime_expanded_from_s {
         let mut t_i_hashset = HashSet::new();
         let mut b = s_prime_i.clone();
         while b != 0 {
-            let var: u64 = b.trailing_zeros().into();
+            let var: u64 = (b.trailing_zeros() as u64) + INDEX_0_OFFSET;
             b &= b - 1;
             for candidate_clause in &clauses_sharing_variable[&var].0 {
                 if (candidate_clause.vars & !s_prime_i) == 0 {
                     // vars in candidate_clause are contained by vars in s_prime_i
-                    t_i_hashset.insert(candidate_clause.clause.clone());
+                    t_i_hashset.insert(candidate_clause.clone());
                 }
             }
         }
 
-        let t_i: Vec<Vec<(u64, u64)>> = Vec::from_iter(t_i_hashset);
+        let t_i: Vec<FormattedElement> = Vec::from_iter(t_i_hashset);
         if t_i.len() > 0 {
             t_contained_by_clauses.push(t_i.clone());
         }
     }
+
+    eprintln!("t_contained_by_clauses: {}", t_contained_by_clauses.len());
 
     // ================================
     //      Step 4
     // ================================
 
     fn cnf_to_neg_anf(clause: &Vec<(u64, u64)>) -> Vec<Vec<u64>> {
-        println!("========");
         let mut clause_iterable_negated: Vec<Vec<u64>> = vec![vec![1]];
         for m in clause {
             clause_iterable_negated.push(vec![m.0, m.1]);
@@ -183,46 +193,48 @@ pub fn retrieve(
     // ========
     // 4.i.
     // ========
-    let mut t_prime_subset_of_t: Vec<Vec<Vec<(u64, u64)>>> = Vec::new();
+    let mut t_prime_subset_of_t: Vec<Vec<FormattedElement>> = Vec::new();
 
     for t_i in t_contained_by_clauses {
         let c_1 = &t_i[0];
-        let anf_c_1: Vec<Vec<u64>> = cnf_to_neg_anf(&c_1);
+        let anf_c_1: Vec<Vec<u64>> = cnf_to_neg_anf(&c_1.clause);
         let chosen_monomial: Vec<u64> = anf_c_1[0].clone();
         let m_prime_encoded_monomial: u128 = encode_bit_vector(chosen_monomial);
 
         let mut s_union_of_other_vars: u128 = 0b0;
         for c_i in &t_i[1..] {
-            let anf_c_i = cnf_to_neg_anf(&c_i);
-            for m in anf_c_i {
-                s_union_of_other_vars |= encode_bit_vector(m);
-            }
+            s_union_of_other_vars |= c_i.vars;
         }
         s_union_of_other_vars = set_intersection(s_union_of_other_vars, !m_prime_encoded_monomial);
 
         let other_vars: Vec<u64> = decode_bit_vector(s_union_of_other_vars);
-
-        let mut shuffled_supported_monomials: Vec<Vec<u64>> = other_vars
-            .iter()
-            .copied()
-            .powerset()
-            .collect();
+        let num_samples = MAX_SAMPLES.min(1usize << other_vars.len().min(63));
         let mut rng = rand::rng();
-        shuffled_supported_monomials.shuffle(&mut rng);
 
         let mut appearances = 0;
-        for (i, m_i) in shuffled_supported_monomials.iter().enumerate() {
-            if i >= MAX_SAMPLES {
-                break;
+        for i in 0..num_samples {
+            let mut m_i_bit_vector: u128 = 0;
+            for &v in &other_vars {
+                if rng.random_bool(0.5) {
+                    m_i_bit_vector |= 1u128 << (v - INDEX_0_OFFSET);
+                }
+            }
+            let product = m_prime_encoded_monomial | m_i_bit_vector;
+            if unique_masks.contains(&product) {
+                appearances += 30;
             }
             if appearances >= SAMPLE_THRESHOLD {
+                t_prime_subset_of_t.push(t_i);
                 break;
             }
-            println!("{:?}", encode_bit_vector(m_i.clone()));
         }
-        // println!("m_prime_encoded_monomial, {}", m_prime_encoded_monomial);
-        // println!("s_union_of_other_vars, {}", s_union_of_other_vars);
-        // println!("Decoded s_union, {:?}", decode_bit_vector(s_union_of_other_vars));
+
+        for t_prime_i in &t_prime_subset_of_t {
+            println!("===============");
+            for m in t_prime_i {
+                println!("{:b}", m.vars);
+            }
+        }
     }
 
     // ========

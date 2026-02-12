@@ -18,18 +18,18 @@ secure = secrets.SystemRandom()
 
 def generate_j_map():
     """Generate J : {1, . . . , α} × {1, . . . , β} → {1, . . . , m}."""
-    if CONDITIONS_B_C:
-        if ALPHA != M:
-            raise ValueError("ALPHA must equal M for conditions B/C")
+    # if CONDITIONS_B_C:
+    #     if ALPHA != M:
+    #         raise ValueError("ALPHA must equal M for conditions B/C")
         
-        indices = list(range(M))
-        secure.shuffle(indices)
-        
-        return [
-            [indices[(i + a - 1) % M] for a in range(1, BETA + 1)]
-            for i in range(1, ALPHA + 1)
-        ]
-    return []
+    indices = list(range(M))
+    secure.shuffle(indices)
+    
+    return [
+        [indices[(i + a - 1) % M] for a in range(1, BETA + 1)]
+        for i in range(1, ALPHA + 1)
+    ]
+    # return []
 
 
 def _encrypt(args):
