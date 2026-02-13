@@ -13,8 +13,8 @@ pub struct FormattedElement {
 }
 
 const INDEX_0_OFFSET: u64 = 2;
-const MAX_SAMPLES: usize = 100;
-const SAMPLE_THRESHOLD: usize = 30;
+const DEFAULT_MAX_SAMPLES: usize = 100;
+const DEFAULT_SAMPLE_THRESHOLD: usize = 30;
 
 #[inline(always)]
 fn encode_bit_vector(var: u64) -> u128 {
@@ -38,11 +38,22 @@ fn cnf_to_neg_anf(clause: &Vec<(u64, u64)>) -> Vec<u128> {
     for &(var, sign) in clause {
         let encoded_var = encode_bit_vector(var);
         let mut updated_result: HashSet<u128> = HashSet::new();
+
         for &m in &result {
-            if !updated_result.remove(&m) {
-                updated_result.insert(m);
-            }
+            // Sign bit is 1 (so we have x)
             if sign != 0 {
+                // add m
+                if !updated_result.remove(&m) {
+                    updated_result.insert(m);
+                }
+                // add m | x
+                let m_with_var = m | encoded_var;
+                if !updated_result.remove(&m_with_var) {
+                    updated_result.insert(m_with_var);
+                }
+            }
+            // Sign bit is 0 (so we have ~x)
+            else {
                 let m_with_var = m | encoded_var;
                 if !updated_result.remove(&m_with_var) {
                     updated_result.insert(m_with_var);
@@ -59,6 +70,8 @@ pub fn retrieve(
     ciphertext: Vec<Vec<u64>>,
     public_key: Vec<Vec<(u64, u64)>>,
     n: u128,
+    max_samples: usize,
+    sample_threshold: usize,
 ) -> PyResult<Vec<Vec<FormattedElement>>> {
     // ================================
     //      Step 1
@@ -85,7 +98,10 @@ pub fn retrieve(
         .flat_map(|i| {
             unique_masks_vec[i + 1..]
                 .iter()
-                .map({let value = unique_masks_vec.clone(); move |mask_b| value[i] | mask_b})
+                .map({
+                    let value = unique_masks_vec.clone();
+                    move |mask_b| value[i] | mask_b
+                })
                 .collect::<Vec<_>>()
         })
         .collect();
@@ -109,7 +125,7 @@ pub fn retrieve(
     }
 
     let mut clauses_sharing_variable: HashMap<u64, (Vec<FormattedElement>, u128)> = HashMap::new();
-    for i in 2..(n as u64) + 2 {
+    for i in INDEX_0_OFFSET..(n as u64) + INDEX_0_OFFSET {
         let encoded_var = encode_bit_vector(i);
         let mut union_vars: u128 = 0;
         let mut clauses_vec: Vec<FormattedElement> = Vec::new();
@@ -122,7 +138,10 @@ pub fn retrieve(
         clauses_sharing_variable.insert(i, (clauses_vec, union_vars));
     }
 
-    eprintln!("clauses_sharing_variable: {}", clauses_sharing_variable.len());
+    eprintln!(
+        "clauses_sharing_variable: {}",
+        clauses_sharing_variable.len()
+    );
 
     let s_prime_expanded_from_s: HashSet<u128> = s_combination_masks
         .par_iter()
@@ -181,51 +200,56 @@ pub fn retrieve(
     // ================================
 
     let t_prime_subset_of_t: Vec<Vec<FormattedElement>> = t_contained_by_clauses
-        .into_par_iter().filter(|t_i| {
-        let c_1 = &t_i[0];
-        // 4.i. Pick any monomial from ANF(negation of c_1)
-        let anf_c_1: Vec<u128> = cnf_to_neg_anf(&c_1.clause);
-        let m_prime: u128 = anf_c_1[0].clone();
+        .into_par_iter()
+        .filter(|t_i| {
+            let c_1 = &t_i[0];
+            // 4.i. Pick any monomial from ANF(negation of c_1)
+            let anf_c_1: Vec<u128> = cnf_to_neg_anf(&c_1.clause);
+            let m_prime: u128 = anf_c_1[0].clone();
 
-        // 4.ii. S = union of vars in c_2...c_k, excluding vars in c_1
-        let mut s_union_of_other_vars: u128 = 0b0;
-        for c_i in &t_i[1..] {
-            s_union_of_other_vars |= c_i.vars;
-        }
-        s_union_of_other_vars = s_union_of_other_vars & !c_1.vars;
+            // 4.ii. S = union of vars in c_2...c_k, excluding vars in c_1
+            let mut s_union_of_other_vars: u128 = 0b0;
+            for c_i in &t_i[1..] {
+                s_union_of_other_vars |= c_i.vars;
+            }
+            s_union_of_other_vars = s_union_of_other_vars & !c_1.vars;
 
-        // 4.iii. Sample random monomials supported on S
-        let other_vars: Vec<u64> = decode_bit_vector(s_union_of_other_vars);
-        let num_samples = MAX_SAMPLES.min(1usize << other_vars.len().min(63));
-        let mut rng = rand::rng();
+            // 4.iii. Sample random monomials supported on S
+            let other_vars: Vec<u64> = decode_bit_vector(s_union_of_other_vars);
+            let max_samples = if max_samples == 0 {
+                DEFAULT_MAX_SAMPLES
+            } else {
+                max_samples
+            };
+            let sample_threshold = if sample_threshold == 0 {
+                DEFAULT_SAMPLE_THRESHOLD
+            } else {
+                sample_threshold
+            };
 
-        let mut appearances = 0;
-        for _ in 0..num_samples {
-            let mut m_i_bit_vector: u128 = 0;
-            for &v in &other_vars {
-                if rng.random_bool(0.5) {
-                    m_i_bit_vector |= 1u128 << (v - INDEX_0_OFFSET);
+            let num_samples = max_samples.min(1usize << other_vars.len().min(63));
+            let mut rng = rand::rng();
+
+            let mut appearances = 0;
+            for _ in 0..num_samples {
+                let mut m_i_bit_vector: u128 = 0;
+                for &v in &other_vars {
+                    if rng.random_bool(0.5) {
+                        m_i_bit_vector |= 1u128 << (v - INDEX_0_OFFSET);
+                    }
+                }
+                // 4.iv. Check if m_prime*m_i appears in the ciphertext
+                let product = m_prime | m_i_bit_vector;
+                if unique_masks.contains(&product) {
+                    appearances += 1;
+                }
+                if appearances >= sample_threshold {
+                    return true;
                 }
             }
-            // 4.iv. Check if m_prime*m_i appears in the ciphertext
-            let product = m_prime | m_i_bit_vector;
-            if unique_masks.contains(&product) {
-                appearances += 1;
-            }
-            if appearances >= SAMPLE_THRESHOLD {
-                return true;
-            }
-        }
-        false
-    })
-    .collect();
-
-    for t_prime_i in &t_prime_subset_of_t {
-        println!("===============");
-        for m in t_prime_i {
-            println!("{:b}", m.vars);
-        }
-    }
+            false
+        })
+        .collect();
 
     Ok(t_prime_subset_of_t)
 }

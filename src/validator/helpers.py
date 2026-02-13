@@ -37,12 +37,40 @@ def product_simplify(a: list, b: list):
     return [set(flatten(x, y)) for x in a for y in b]
 
 
-def cnf_to_neg_anf(term: list):
-    if not isinstance(term, list):
+# def cnf_to_neg_anf(term: list):
+#     if not isinstance(term, list):
+#         raise ValueError("`term` argument for cnf_to_neg_anf() must be a list")
+#     term = term + [(1,)]
+#     term = cartesian(*term)
+#     term = filter(lambda t: 0 not in t and t.count(1) % 2 == 1, term)
+#     term = map(lambda t: tuple(filter(lambda t: t != 1, t)), term)
+#     term = map(lambda t: tuple(set(t)), term)
+#     return list(term)
+
+def cnf_to_neg_anf(clause: list):
+    if not isinstance(clause, list):
         raise ValueError("`term` argument for cnf_to_neg_anf() must be a list")
-    term = term + [(1,)]
-    term = cartesian(*term)
-    term = filter(lambda t: 0 not in t, term)
-    term = map(lambda t: tuple(filter(lambda t: t != 1, t)), term)
-    term = map(lambda t: tuple(set(t)), term)
-    return list(term)
+
+    result = {frozenset()}
+
+    for var, sign in clause:
+        updated = {}
+        for monomial in result:
+            if sign != 0:
+  
+                for m_new in [monomial, monomial | frozenset([var])]:
+                    if m_new in updated:
+                        del updated[m_new]
+                    else:
+                        updated[m_new] = True
+            else:
+                m_new = monomial | frozenset([var])
+                if m_new in updated:
+                    del updated[m_new]
+                else:
+                    updated[m_new] = True
+        result = set(updated.keys())
+
+    return [tuple(sorted(m)) for m in result]
+
+

@@ -7,3 +7,13 @@
      ii. Let S be the union of variables involved in c_2, ..., c_k, but excluding the variables already present in c_1.
      iii. Pick 100 uniformly random monomials m_1, ..., m_100 supported on S. As with m', represent these as sets of variables.
      iv. Count how many of the monomials m'm_1, ..., m'm_100 actually appear in the ciphertext. If the count is at least 30, add t_i to the new set T'. Otherwise, don't add t_i.
+
+5. With the groups identified, we can simply set up a linear system with the unknowns being the coefficients of the random functions. Then we try to solve for the ciphertext under the assumption that the message bit was zero, and then again under the assumption that the message bit was one. If either case succeeds, this certifies what the encrypted bit was. Otherwise (which happens with inverse subexp probability) we just run the brute-force quasipoly-time linearization, which ensures that we always succeed and that the expected running time is polynomial.
+
+That is,
+When we set up the linear system assuming "message = 0", and then assuming "message = 1", there are four possibilities:
+     1. Both systems have a solution. This is actually mathematically impossible.
+     2. Only the "message = 0" case has a solution. Then this mathematically certifies that the correct message bit was 0.
+     3. Only the "message = 1" case has a solution. As before, this certifies the message bit.
+     4. Neither system has a solution. Then we go back to the T -> T' conversion, and re-run this with 1000 in place of 100 and 300 in place of 30.
+
