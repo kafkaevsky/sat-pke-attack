@@ -16,11 +16,7 @@ def _linearization(ciphertext_file, public_key_file):
     ciphertext_set = {tuple(m) for m in ciphertext_file["ciphertext"]}
 
 
-def main():
-
-    parser = argparse.ArgumentParser(prog="Attack")
-    parser.add_argument("i", type=int)
-    args = parser.parse_args()
+def attack(args):
 
     DIR = f"tests/c_{args.i}"
 
@@ -32,10 +28,6 @@ def main():
                     Run `source venv/bin/activate && maturin develop --manifest-path src/validator/attacks/retrieve_rs/Cargo.toml`"""
                 )
 
-            # ct = [[2, 3, 4], [6], [5, 5], [7, 3]]
-            # pk = [[(1, 1), (2, 0), (3, 1)], [(2, 0), (3, 1), (4, 0)], [(4, 0), (5, 1), (6, 1)], [(6, 1), (1, 1), (3, 0)]]
-            # n = 10
-
             ct = list({tuple(m) for m in CIPHERTEXT_FILE["ciphertext"]})
             pk = [tuple(c) for c in ast.literal_eval(PUBLIC_KEY_FILE.read())]
             n = N
@@ -45,6 +37,14 @@ def main():
                 print(x.clause, x.vars)
             # y = _linearization(CIPHERTEXT_FILE, CLAUSES_FILE)
             # print(y)
+
+
+def main():
+
+    parser = argparse.ArgumentParser(prog="Attack")
+    parser.add_argument("i", type=int)
+    args = parser.parse_args()
+    attack(args)
 
 
 if __name__ == "__main__":

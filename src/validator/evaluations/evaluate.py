@@ -1,16 +1,45 @@
 from ..parameters import *
-from ..helpers import *
+from ..primitives.encrypt import _encrypt
+from ..primitives.decrypt import _g
+from ..attacks.attack import attack as run_attack
 import os
+import shutil
 import argparse
 import random
+import time
+import h5py
+from types import SimpleNamespace
 from tqdm import tqdm
+
+
+def _format_hdf5(filepath):
+    lines = []
+    with h5py.File(filepath, "r") as f:
+        def _visit(name, obj):
+            if isinstance(obj, h5py.Dataset):
+                lines.append(f'DATASET "{name}" {{')
+                lines.append(f"   DATATYPE  {obj.dtype}")
+                lines.append(f"   DATASPACE  SIMPLE {{ ( {obj.shape[0]} ) / ( {obj.shape[0]} ) }}")
+                lines.append("   DATA {")
+                for i, item in enumerate(obj):
+                    lines.append(f"   ({i}): {list(item)}")
+                lines.append("   }")
+                lines.append("}")
+        f.visititems(_visit)
+    return "\n".join(lines)
+
 
 def _evaluate(args):
     os.makedirs("tests", exist_ok=True)
     if EVALUATE_CLEARS_DATA:
         if os.path.isdir("tests") and len(os.listdir("tests")) > 0:
-            run_zsh("rm -rf $DATA_DIRECTORY/*")
-            print(f"tests directory cleared")
+            for entry in os.listdir("tests"):
+                entry_path = os.path.join("tests", entry)
+                if os.path.isdir(entry_path):
+                    shutil.rmtree(entry_path)
+                else:
+                    os.remove(entry_path)
+            print("tests directory cleared")
 
     ciphers = []
     t = 0
@@ -27,19 +56,20 @@ def _evaluate(args):
             plaintext = random.getrandbits(1)
 
         i = 1
-        ciphertext_dirpath = f"{"tests"}/c_{i}"
+        ciphertext_dirpath = f"tests/c_{i}"
         
         while os.path.isdir(ciphertext_dirpath):
             i += 1
-            ciphertext_dirpath = f"{"tests"}/c_{i}"
+            ciphertext_dirpath = f"tests/c_{i}"
         os.mkdir(ciphertext_dirpath)
 
-
-        cmd = f'time python3 -m validator.primitives.encrypt -i "{i}" -y "{plaintext}"'
-        res = run_zsh(cmd, capture=True)
+        encrypt_args = SimpleNamespace(i=i, plaintext=plaintext)
+        start_time = time.time()
+        _encrypt(encrypt_args)
+        elapsed = time.time() - start_time
 
         ciphers.append(str(i))
-        t += float(res.stderr[:-2])
+        t += elapsed
 
         PLAINTEXT_FILEPATH = f"{ciphertext_dirpath}/plaintext_{i}.txt"
         CIPHERTEXT_TXT_FILEPATH = f"{ciphertext_dirpath}/ciphertext_{i}.txt"
@@ -50,26 +80,20 @@ def _evaluate(args):
 
         if INCLUDE_READABLE_CIPHERTEXT:
             with open(CIPHERTEXT_TXT_FILEPATH, "w") as file:
-                cmd = f"h5dump --width=1 '{CIPHERTEXT_HDF5_FILEPATH}'"
-                cipher = run_zsh(cmd, capture=True)
-                file.write(cipher.stdout)
+                file.write(_format_hdf5(CIPHERTEXT_HDF5_FILEPATH))
 
         if args.generate_only:
             s = f"ciphertext {i} created: y={plaintext}"
         else:
-            cmd = f"decrypt {i}"
-            decryption_results = run_zsh(cmd, capture=True)
-            decryption = int(decryption_results.stdout[:-1])
+            decrypt_args = SimpleNamespace(n=i)
+            decryption = _g(decrypt_args)
 
-
-            cmd = f"attack {i}"
-            attack_results = run_zsh(cmd, capture=True)
+            attack_args = SimpleNamespace(i=i)
             try:
-                attack = int(attack_results.stdout[:-1])
-            except ValueError as e:
-                print(e, attack_results)
+                attack = run_attack(attack_args)
+            except Exception as e:
+                print(e)
                 return
-
 
             code = attack
             if code >= 0:
