@@ -11,12 +11,31 @@ import ast
 from collections import defaultdict
 
 
-def _linearization(ciphertext_file, t_prime):
+def _rank_gf2_bitrows(rows):
+    basis = {}
+    for r in rows:
+        x = r
+        while x:
+            pivot = x.bit_length() - 1
+            if pivot in basis:
+                x ^= basis[pivot]
+            else:
+                basis[pivot] = x
+                break
+    return len(basis)
 
-    if "ciphertext" not in ciphertext_file:
-        raise KeyError()
 
-    ciphertext_set = {tuple((int(x) for x in m)) for m in ciphertext_file["ciphertext"]}
+def _is_consistent_bitrows(row_masks, b_vec, ncols):
+    rank_a = _rank_gf2_bitrows(row_masks)
+    aug_bit = 1 << ncols
+    augmented_rows = []
+    for r, b_i in zip(row_masks, b_vec):
+        augmented_rows.append(r ^ (aug_bit if b_i else 0))
+    rank_aug = _rank_gf2_bitrows(augmented_rows)
+    return rank_a == rank_aug
+
+
+def _linearization_python(ciphertext_set, t_prime):
 
     def clause_from_element(element):
         if hasattr(element, "clause"):
@@ -65,28 +84,6 @@ def _linearization(ciphertext_file, t_prime):
     for i, term in enumerate(term_list):
         b[i] = 1 if term in ciphertext_set else 0
 
-    def _rank_gf2_bitrows(rows):
-        basis = {}
-        for r in rows:
-            x = r
-            while x:
-                pivot = x.bit_length() - 1
-                if pivot in basis:
-                    x ^= basis[pivot]
-                else:
-                    basis[pivot] = x
-                    break
-        return len(basis)
-
-    def _is_consistent_bitrows(row_masks, b_vec, ncols):
-        rank_a = _rank_gf2_bitrows(row_masks)
-        aug_bit = 1 << ncols
-        augmented_rows = []
-        for r, b_i in zip(row_masks, b_vec):
-            augmented_rows.append(r ^ (aug_bit if b_i else 0))
-        rank_aug = _rank_gf2_bitrows(augmented_rows)
-        return rank_a == rank_aug
-
     row_masks = [term_to_mask[t] for t in term_list]
 
     b0 = b.copy()
@@ -98,6 +95,44 @@ def _linearization(ciphertext_file, t_prime):
         return y, "ok0" if y == 0 else "ok1"
 
     b1[constant_row] ^= 1
+
+    ok0 = _is_consistent_bitrows(row_masks, b0, coefficient_count)
+    ok1 = _is_consistent_bitrows(row_masks, b1, coefficient_count)
+
+    if ok0 and ok1:
+        return None, "both"
+    if ok0 and not ok1:
+        return 0, "ok0"
+    if ok1 and not ok0:
+        return 1, "ok1"
+    return None, "neither"
+
+
+def _linearization(ciphertext_terms, t_prime):
+    ciphertext_set = {tuple(int(x) for x in m) for m in ciphertext_terms}
+
+    if retrieve_rs is None or not hasattr(retrieve_rs, "linearization_build"):
+        return _linearization_python(ciphertext_set, t_prime)
+
+    row_masks_words, b, constant_row, coefficient_count, constant_in_ciphertext = (
+        retrieve_rs.linearization_build(list(ciphertext_terms), t_prime)
+    )
+
+    row_masks = []
+    for words in row_masks_words:
+        bitmask = 0
+        for word_i, word in enumerate(words):
+            bitmask |= int(word) << (64 * word_i)
+        row_masks.append(bitmask)
+
+    b0 = np.array(b, dtype=np.uint8)
+    b1 = b0.copy()
+
+    if constant_row is None:
+        y = int(constant_in_ciphertext)
+        return y, "ok0" if y == 0 else "ok1"
+
+    b1[int(constant_row)] ^= 1
 
     ok0 = _is_consistent_bitrows(row_masks, b0, coefficient_count)
     ok1 = _is_consistent_bitrows(row_masks, b1, coefficient_count)
@@ -127,10 +162,10 @@ def attack(args, m, n):
             pk = [tuple(c) for c in ast.literal_eval(PUBLIC_KEY_FILE.read())]
 
             res = retrieve_rs.retrieve(ct, pk, n, 100, 30)
-            y, status = _linearization(CIPHERTEXT_FILE, res)
+            y, status = _linearization(ct, res)
             if status == "neither":
                 res = retrieve_rs.retrieve(ct, pk, n, 1000, 300)
-                y, status = _linearization(CIPHERTEXT_FILE, res)
+                y, status = _linearization(ct, res)
             if status == "both":
                 raise RuntimeError(
                     "message assumptions were both solvable => there is a bug with the code"

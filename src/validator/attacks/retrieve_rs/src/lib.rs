@@ -3,6 +3,14 @@ use rand::RngExt;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
+#[derive(Clone)]
+struct LinearizationTask {
+    c_i: Vec<u128>,
+    r_var_bits: Vec<u128>,
+    start_col: usize,
+    n_subsets: usize,
+}
+
 #[pyclass]
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct FormattedElement {
@@ -63,6 +71,154 @@ fn cnf_to_neg_anf(clause: &Vec<(u64, u64)>) -> Vec<u128> {
         result = updated_result;
     }
     result.into_iter().collect()
+}
+
+fn toggle_column(row_words: &mut [u64], col: usize) {
+    let word_i = col / 64;
+    let bit_i = col % 64;
+    row_words[word_i] ^= 1u64 << bit_i;
+}
+
+fn merge_mask_maps(
+    mut left: HashMap<u128, Vec<u64>>,
+    right: HashMap<u128, Vec<u64>>,
+    words: usize,
+) -> HashMap<u128, Vec<u64>> {
+    if left.is_empty() {
+        return right;
+    }
+    if right.is_empty() {
+        return left;
+    }
+
+    for (term, right_words) in right {
+        let entry = left.entry(term).or_insert_with(|| vec![0u64; words]);
+        for (x, y) in entry.iter_mut().zip(right_words.iter()) {
+            *x ^= *y;
+        }
+    }
+    left
+}
+
+#[pyfunction]
+pub fn linearization_build(
+    ciphertext: Vec<Vec<u64>>,
+    t_prime: Vec<Vec<FormattedElement>>,
+) -> PyResult<(Vec<Vec<u64>>, Vec<u8>, Option<usize>, usize, bool)> {
+    let ciphertext_set: HashSet<u128> = ciphertext
+        .into_iter()
+        .map(|m| m.into_iter().fold(0u128, |acc, x| acc | encode_bit_vector(x)))
+        .collect();
+
+    let mut tasks: Vec<LinearizationTask> = Vec::new();
+    let mut coefficient_count: usize = 0;
+
+    for t_prime_i in &t_prime {
+        let len_i = t_prime_i.len();
+        if len_i == 0 {
+            continue;
+        }
+
+        let clause_anfs: Vec<Vec<u128>> = t_prime_i
+            .iter()
+            .map(|element| cnf_to_neg_anf(&element.clause))
+            .collect();
+
+        for i in 0..len_i {
+            let mut r_vars_mask: u128 = 0;
+            for (j, element) in t_prime_i.iter().enumerate() {
+                if i != j {
+                    r_vars_mask |= element.vars;
+                }
+            }
+
+            let mut r_var_bits: Vec<u128> = Vec::with_capacity(r_vars_mask.count_ones() as usize);
+            let mut bits = r_vars_mask;
+            while bits != 0 {
+                let bit = bits.trailing_zeros();
+                r_var_bits.push(1u128 << bit);
+                bits &= bits - 1;
+            }
+
+            if r_var_bits.len() >= usize::BITS as usize {
+                return Err(PyErr::new::<pyo3::exceptions::PyOverflowError, _>(
+                    "too many variables in R_vars for subset enumeration",
+                ));
+            }
+
+            let n_subsets: usize = 1usize << r_var_bits.len();
+            let start_col = coefficient_count;
+            coefficient_count = coefficient_count
+                .checked_add(n_subsets)
+                .ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyOverflowError, _>(
+                        "coefficient_count overflowed usize",
+                    )
+                })?;
+
+            tasks.push(LinearizationTask {
+                c_i: clause_anfs[i].clone(),
+                r_var_bits,
+                start_col,
+                n_subsets,
+            });
+        }
+    }
+
+    let words: usize = coefficient_count.div_ceil(64);
+
+    let term_to_mask_words: HashMap<u128, Vec<u64>> = tasks
+        .par_iter()
+        .map(|task| {
+            let mut local_map: HashMap<u128, Vec<u64>> = HashMap::new();
+
+            for subset_i in 0..task.n_subsets {
+                let mut r_term: u128 = 0;
+                for (bit_i, var_bit) in task.r_var_bits.iter().enumerate() {
+                    if ((subset_i >> bit_i) & 1usize) != 0 {
+                        r_term |= *var_bit;
+                    }
+                }
+
+                let col = task.start_col + subset_i;
+
+                for &c_term in &task.c_i {
+                    let literals = r_term | c_term;
+                    let row_words = local_map.entry(literals).or_insert_with(|| vec![0u64; words]);
+                    toggle_column(row_words, col);
+                }
+            }
+
+            local_map
+        })
+        .reduce(
+            || HashMap::new(),
+            |left, right| merge_mask_maps(left, right, words),
+        );
+
+    let mut term_and_rows: Vec<(u128, Vec<u64>)> = term_to_mask_words.into_iter().collect();
+    term_and_rows.sort_by_key(|(term, _)| *term);
+
+    let mut row_masks_words: Vec<Vec<u64>> = Vec::with_capacity(term_and_rows.len());
+    let mut b: Vec<u8> = Vec::with_capacity(term_and_rows.len());
+    let mut constant_row: Option<usize> = None;
+
+    for (row_i, (term, row_words)) in term_and_rows.into_iter().enumerate() {
+        if term == 0 {
+            constant_row = Some(row_i);
+        }
+        b.push(if ciphertext_set.contains(&term) { 1 } else { 0 });
+        row_masks_words.push(row_words);
+    }
+
+    let constant_in_ciphertext = ciphertext_set.contains(&0);
+    Ok((
+        row_masks_words,
+        b,
+        constant_row,
+        coefficient_count,
+        constant_in_ciphertext,
+    ))
 }
 
 #[pyfunction]
@@ -258,5 +414,6 @@ pub fn retrieve(
 fn retrieve_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<FormattedElement>()?;
     m.add_function(wrap_pyfunction!(retrieve, m)?)?;
+    m.add_function(wrap_pyfunction!(linearization_build, m)?)?;
     Ok(())
 }
