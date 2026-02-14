@@ -111,7 +111,7 @@ def _linearization(ciphertext_file, t_prime):
     return None, "neither"
 
 
-def attack(args):
+def attack(args, m, n):
 
     DIR = f"tests/c_{args.i}"
 
@@ -123,9 +123,8 @@ def attack(args):
                     Run `source venv/bin/activate && maturin develop --manifest-path src/validator/attacks/retrieve_rs/Cargo.toml`"""
                 )
 
-            ct = list({tuple(m) for m in CIPHERTEXT_FILE["ciphertext"]})
+            ct = list({tuple(int(v) for v in m) for m in CIPHERTEXT_FILE["ciphertext"]})
             pk = [tuple(c) for c in ast.literal_eval(PUBLIC_KEY_FILE.read())]
-            n = N
 
             res = retrieve_rs.retrieve(ct, pk, n, 100, 30)
             y, status = _linearization(CIPHERTEXT_FILE, res)

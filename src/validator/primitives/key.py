@@ -5,25 +5,34 @@ import os
 sys.path.append(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
-from ..parameters import *
+# from ..parameters import *
 
-secure = secrets.SystemRandom()
 
-PRIVATE_KEY_STRING = f"{bin(secrets.randbits(N))[2:]:0>{N}}"  # B^n
+class KeyInstance:
 
-validate_clause = (
-    lambda literal_index, parity: int(PRIVATE_KEY_STRING[literal_index]) == parity
-)
+    def __init__(self, n, m, k):
+        self.n = n
+        self.m = m
+        self.k = k
+        self.secure = secrets.SystemRandom()
+        self.private_key_string = f"{bin(secrets.randbits(self.n))[2:]:0>{self.n}}"  # B^n
 
-def _generate_valid_clause():
-    clause_literals = [l+2 for l in secure.sample(range(N), K)]
-    clause_signs = secure.sample([0, 1] * K, K)
-    clause = [clause_literals, clause_signs]
+    def validate_clause(self, literal_index, parity):
+        return int(self.private_key_string[literal_index]) == parity
 
-    if any([validate_clause(int(clause[0][k]) - 2, clause[1][k]) for k in range(K)]):
-        c = list(zip(*clause))
-        return c
-    return _generate_valid_clause()
+    def _generate_valid_clause(self):
+        clause_literals = [l+2 for l in self.secure.sample(range(self.n), self.k)]
+        clause_signs = self.secure.sample([0, 1] * self.k, self.k)
+        clause = [clause_literals, clause_signs]
 
-def generate_clause_list():
-    return [_generate_valid_clause() for _ in range(M)]
+        if any([self.validate_clause(int(clause[0][k]) - 2, clause[1][k]) for k in range(self.k)]):
+            c = list(zip(*clause))
+            return c
+        return self._generate_valid_clause()
+
+    def generate_clause_list(self):
+        return [self._generate_valid_clause() for _ in range(self.m)]
+
+
+# def get_key_instance(n, m, alpha, beta, k):
+#     r

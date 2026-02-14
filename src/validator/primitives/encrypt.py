@@ -16,37 +16,38 @@ sys.path.append(
 secure = secrets.SystemRandom()
 
 
-def generate_j_map():
+def generate_j_map(n, m, alpha, beta):
     """Generate J : {1, . . . , α} × {1, . . . , β} → {1, . . . , m}."""
     # if CONDITIONS_B_C:
     #     if ALPHA != M:
     #         raise ValueError("ALPHA must equal M for conditions B/C")
         
-    indices = list(range(M))
+    indices = list(range(m))
     secure.shuffle(indices)
     
     return [
-        [indices[(i + a - 1) % M] for a in range(1, BETA + 1)]
-        for i in range(1, ALPHA + 1)
+        [indices[(i + a - 1) % m] for a in range(1, beta + 1)]
+        for i in range(1, alpha + 1)
     ]
     # return []
 
 
-def _encrypt(args):
-    PUBLIC_KEY = key.generate_clause_list()
-    J_MAP = generate_j_map()
+def _encrypt(args, n=N, m=M, alpha=ALPHA, beta=BETA):
+    KEY_INSTANCE = key.KeyInstance(n, m, K)
+    PUBLIC_KEY = KEY_INSTANCE.generate_clause_list()
+    J_MAP = generate_j_map(n, m, alpha, beta)
 
     ciphertext = np.empty(0, dtype=object)
     beta_literals_sets = []
 
-    for a in range(ALPHA):
+    for a in range(alpha):
         beta_clauses_list = [PUBLIC_KEY[r] for r in J_MAP[a]]
         beta_literals_list = [l[0] for l in flatten(*beta_clauses_list)]
         beta_counts_set = set(Counter(beta_literals_list).items())
         beta_literals_set = sorted(set(beta_literals_list))
         beta_literals_sets.append(beta_literals_set)
 
-        for i in range(BETA):
+        for i in range(beta):
 
             clause = PUBLIC_KEY[J_MAP[a][i]]
             clause_literals_set = set(l[0] for l in clause)
@@ -98,7 +99,7 @@ def _encrypt(args):
     CIPHERTEXT_FILEPATH = f"tests/c_{args.i}/ciphertext_{args.i}.hdf5"
 
     with open(PRIVATE_KEY_FILEPATH, "w") as f:
-        f.write(str(f"{key.PRIVATE_KEY_STRING}\n"))
+        f.write(str(f"{KEY_INSTANCE.private_key_string}\n"))
 
     with open(BETA_LITERALS_SETS_FILEPATH, "w") as f:
         f.write(str(f"{beta_literals_sets}\n"))
